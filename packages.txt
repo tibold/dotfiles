@@ -1,0 +1,10 @@
+neovim
+tmux
+zsh
+git
+lazygit
+gh
+powerline-fonts
+htop
+gcc
+
