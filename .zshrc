@@ -1,7 +1,5 @@
-
-
-
-
+alias vim=nvim
+alias vi=nvim
 
 # The following lines were added by compinstall
 
@@ -23,6 +21,11 @@ SAVEHIST=1000000
 setopt autocd extendedglob nomatch
 unsetopt beep notify
 bindkey -v
+
 # End of lines configured by zsh-newuser-install
-source /usr/share/powerline/zsh/powerline.zsh
-source /usr/share/powerline/zsh/powerline.zsh
+if [ -f /usr/share/powerline/zsh/powerline.zsh ]; then
+  source /usr/share/powerline/zsh/powerline.zsh
+fi
+
+# Created by `pipx` on 2026-03-21 14:14:58
+export PATH="$PATH:/root/.local/bin"

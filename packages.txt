@@ -4,7 +4,12 @@ zsh
 git
 lazygit
 gh
+powerline
+powerline-docs
 powerline-fonts
+tmux-powerline      
+vim-plugin-powerline
 htop
 gcc
-
+mkisofs
+python313-pipx
