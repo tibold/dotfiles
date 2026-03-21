@@ -54,5 +54,10 @@ clone_repo() {
 }
 
 log 'Clone neovim configuration'
-clone_repo "https://github.com/tibold/astrovim-init.git" "$HOME/.config/nvim"
+if [ -n "$SSH_AUTH_SOCK" ]; then
+  # on servers where access is only granted through a remote ssh_agents
+  clone_repo "git@github.com:tibold/astrovim-init.git" "$HOME/.config/nvim"
+else
+  clone_repo "https://github.com/tibold/astrovim-init.git" "$HOME/.config/nvim"
+fi
 log 'Neovim will install its plugins on first start'
