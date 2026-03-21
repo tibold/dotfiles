@@ -25,6 +25,9 @@ ln -sf "$SCRIPT_DIR/.tmux.conf" ~/.tmux.conf
 ln -sf "$SCRIPT_DIR/.zshrc" ~/.zshrc
 ln -sf "$SCRIPT_DIR/config/powerline-tmux.conf" ~/.config/powerline-tmux.conf
 
+log 'Install zsh plugins'
+"$SCRIPT_DIR/scripts/setup-zsh-plugins.sh"
+
 # Clone nvim config
 clone_repo() {
   local url="$1"

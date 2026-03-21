@@ -1,6 +1,7 @@
 neovim
 tmux
 zsh
+helm-zsh-completion
 git
 lazygit
 gh
@@ -13,3 +14,7 @@ htop
 gcc
 mkisofs
 python313-pipx
+fzf 
+fzf-tmux 
+fzf-zsh-integration
+vim-fzf
