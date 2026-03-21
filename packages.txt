@@ -18,3 +18,5 @@ fzf
 fzf-tmux 
 fzf-zsh-integration
 vim-fzf
+podman
+podman-docker
