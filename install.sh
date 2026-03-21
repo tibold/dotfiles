@@ -12,8 +12,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 log 'Install system packages'
 sudo zypper install -y $(cat packages.txt)
 
+log 'Install Python packages'
+sudo pip install $(cat pip_packages.txt)
+
 log 'Install Python packages (pipx)'
-sudo pipx install $(cat pip_packages.txt)
+sudo pipx install $(cat pipx_packages.txt)
+
+log 'Install npm.js packages'
+sudo npm install $(cat npm_packages.txt)
 
 log 'Ensure PATH has ~/.local/bin'
 pipx ensurepath

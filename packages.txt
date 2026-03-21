@@ -20,3 +20,7 @@ fzf-zsh-integration
 vim-fzf
 podman
 podman-docker
+ripgrep
+ripgrep-bash-completion
+ripgrep-zsh-completion
+nodejs-default
