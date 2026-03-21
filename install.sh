@@ -24,8 +24,6 @@ log 'Link dot files and config in place'
 ln -sf "$SCRIPT_DIR/.tmux.conf" ~/.tmux.conf
 ln -sf "$SCRIPT_DIR/.zshrc" ~/.zshrc
 ln -sf "$SCRIPT_DIR/config/powerline-tmux.conf" ~/.config/powerline-tmux.conf
-ln -sf "$SCRIPT_DIR/tmuxp" ~/.tmuxp
-ln -sf "$SCRIPT_DIR/bin/claude" ~/.local/bin/claude
 
 # Clone nvim config
 clone_repo() {
@@ -55,5 +53,3 @@ clone_repo() {
 log 'Clone neovim configuration'
 clone_repo "https://github.com/tibold/astrovim-init.git" "$HOME/.config/nvim"
 log 'Neovim will install its plugins on first start'
-
-"$SCRIPT_DIR/scripts/setup-claude-assistant.sh"

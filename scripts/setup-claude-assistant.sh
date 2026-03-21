@@ -7,8 +7,12 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 USERNAME="claude-assistant"
 WORK_DIR="/home/${USERNAME}/work"
+
+ln -sf "$SCRIPT_DIR/bin/claude" ~/.local/bin/claude
+ln -sf "$SCRIPT_DIR/tmuxp/claude.yaml" ~/.tmuxp/claude.yaml
 
 # --- Helpers ---
 
@@ -144,6 +148,43 @@ LAUNCH
   fi
 }
 
+# --- Hardening wrapper ---
+#
+# Create a hardened wrapper
+create_su_wrapper() {
+  local wrapper="/usr/local/bin/su-claude"
+
+  cat >"$wrapper" <<EOF
+#!/bin/bash
+# Launch a restricted shell for claude-assistant
+# - Only /home/${USERNAME} is visible and writable
+# - /etc, other homes, system dirs are hidden or read-only
+# - Private /tmp
+# - No device access
+
+CMD="\${*:-/home/${USERNAME}/start-claude.sh}"
+
+exec systemd-run --uid=claude-assistant --gid=claude-assistant \\
+  --property="ProtectHome=tmpfs" \\
+  --property="ReadOnlyPaths=/etc" \\
+  --property="InaccessiblePaths=/etc/shadow /etc/sudoers /etc/sudoers.d /etc/ssh" \\
+  --property="BindPaths=/home/claude-assistant" \\
+  --property="ProtectSystem=strict" \\
+  --property="PrivateTmp=yes" \\
+  --property="PrivateDevices=yes" \\
+  --property="ProtectKernelTunables=yes" \\
+  --property="ProtectKernelModules=yes" \\
+  --property="ProtectControlGroups=yes" \\
+  --property="RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX" \\
+  --pty -- /bin/bash -l -c "\$CMD"
+EOF
+
+  chmod +x "$wrapper"
+  log "Created $wrapper"
+  log "Usage: sudo su-claude"
+  log "Or: sudo su-claude bash"
+}
+
 # --- Main ---
 
 main() {
@@ -157,6 +198,7 @@ main() {
   configure_claude_plugins
   create_claude_md
   create_launch_script
+  create_su_wrapper
 
   echo ""
   log "Non-interactive setup complete."

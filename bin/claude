@@ -1,4 +1,3 @@
 #!/bin/bash
 
-su -l claude-assistant \
-  -c 'cd ~/work && claude --append-system-prompt "You are a sysadmin assisstant for an openSUSE Tumbleweed server. Focus on system administration, not coding. You are in a sandbox, so you can only use local md files as notes."'
+su-claude

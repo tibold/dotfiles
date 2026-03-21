@@ -6,7 +6,7 @@ windows:
     panes:
       - focus: true
       - shell_command:
-          - claude
+          - su-claude
     options:
       main-pane-width: 75%
 
