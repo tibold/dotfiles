@@ -97,7 +97,6 @@ plugins=(
   podman         # Podman completions
   docker-compose # Docker compose aliases (dco, dcup, dcdown...)
   systemd        # systemctl aliases (sc-start, sc-stop, sc-status...)
-  ssh-agent      # Auto-starts ssh-agent
 
   # -- Sysadmin --
   rsync       # rsync aliases
