@@ -142,6 +142,7 @@ export LANG=en_US.UTF-8
 
 alias vim=nvim
 alias vi=nvim
+export EDITOR=nvim
 
 # The following lines were added by compinstall
 
