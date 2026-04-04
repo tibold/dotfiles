@@ -28,6 +28,7 @@ export PATH="$PATH:$HOME/.local/bin"
 # install.sh
 log 'Link dot files and config in place'
 ln -sf "$SCRIPT_DIR/.tmux.conf" ~/.tmux.conf
+ln -sf "$SCRIPT_DIR/.bashrc" ~/.bashrc
 ln -sf "$SCRIPT_DIR/.zshrc" ~/.zshrc
 ln -sf "$SCRIPT_DIR/config/powerline-tmux.conf" ~/.config/powerline-tmux.conf
 
