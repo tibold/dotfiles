@@ -24,4 +24,5 @@ ripgrep
 ripgrep-bash-completion
 ripgrep-zsh-completion
 nodejs-default
+npm-default
 jq
