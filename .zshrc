@@ -99,6 +99,7 @@ plugins=(
   systemd        # systemctl aliases (sc-start, sc-stop, sc-status...)
 
   # -- Sysadmin --
+  suse        # because I mostly use OpenSUSE
   rsync       # rsync aliases
   systemadmin # System administration helpers
   firewalld   # firewalld completions
