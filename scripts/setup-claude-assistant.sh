@@ -11,6 +11,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 USERNAME="claude-assistant"
 WORK_DIR="/home/${USERNAME}/work"
 
+mkdir -p ~/.local/bin
+mkdir -p ~/.tmuxp/
+
 ln -sf "$SCRIPT_DIR/bin/claude" ~/.local/bin/claude
 ln -sf "$SCRIPT_DIR/tmuxp/claude.yaml" ~/.tmuxp/claude.yaml
 
