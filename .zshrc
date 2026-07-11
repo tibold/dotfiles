@@ -174,3 +174,7 @@ unsetopt beep notify
 
 # Created by `pipx` on 2026-03-21 14:14:58
 export PATH="$PATH:/root/.local/bin"
+
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey -M vicmd 'v' edit-command-line
