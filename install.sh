@@ -61,10 +61,24 @@ clone_repo() {
 }
 
 log 'Clone neovim configuration'
-if [ -n "$SSH_AUTH_SOCK" ]; then
-  # on servers where access is only granted through a remote ssh_agents
+# Pick the transport by what can actually authenticate, in that order.
+#
+# This used to test [ -n "$SSH_AUTH_SOCK" ], which asks the wrong question:
+# GNOME's gcr-ssh-agent exports that socket in every desktop session whether or
+# not a key is loaded, so on a workstation it was always set and the ssh branch
+# was always taken -- with an empty agent, so the clone failed while gh and
+# https sat there working.
+#
+# ssh-add -l is the right test for the ssh case: it exits non-zero both when the
+# agent holds no identities and when there is no agent to reach.
+if gh auth status >/dev/null 2>&1; then
+  # gh installs itself as git's credential helper, so https needs nothing else
+  clone_repo "https://github.com/tibold/astrovim-init.git" "$HOME/.config/nvim"
+elif ssh-add -l >/dev/null 2>&1; then
+  # on servers where access is only granted through a forwarded ssh agent
   clone_repo "git@github.com:tibold/astrovim-init.git" "$HOME/.config/nvim"
 else
+  # nothing is set up either way; https at least lets git prompt
   clone_repo "https://github.com/tibold/astrovim-init.git" "$HOME/.config/nvim"
 fi
 log 'Neovim will install its plugins on first start'
