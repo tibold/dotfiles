@@ -33,3 +33,8 @@
 # change rather than only a display one.
 [merge]
 	conflictStyle = zdiff3
+
+# Rebase on pull rather than merge, so pulling a branch that has moved does not
+# manufacture a merge commit for work that was only ever local.
+[pull]
+	rebase = true
