@@ -31,6 +31,10 @@ ln -sf "$SCRIPT_DIR/.tmux.conf" ~/.tmux.conf
 ln -sf "$SCRIPT_DIR/.bashrc" ~/.bashrc
 ln -sf "$SCRIPT_DIR/.zshrc" ~/.zshrc
 ln -sf "$SCRIPT_DIR/config/powerline-tmux.conf" ~/.config/powerline-tmux.conf
+# lazygit reads a directory rather than a flat file in ~/.config, so the
+# directory has to exist before the link goes into it.
+mkdir -p ~/.config/lazygit
+ln -sf "$SCRIPT_DIR/config/lazygit/config.yml" ~/.config/lazygit/config.yml
 
 log 'Install zsh plugins'
 "$SCRIPT_DIR/scripts/setup-zsh-plugins.sh"

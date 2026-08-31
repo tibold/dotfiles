@@ -4,6 +4,7 @@ zsh
 helm-zsh-completion
 git
 lazygit
+git-delta
 gh
 powerline
 powerline-docs
