@@ -38,3 +38,9 @@
 # manufacture a merge commit for work that was only ever local.
 [pull]
 	rebase = true
+
+# Stash and restore a dirty tree around the rebase, so pulling does not have to
+# wait for uncommitted work to reach a committable state. The stash is reapplied
+# afterwards, and stays in the stash list if reapplying conflicts.
+[rebase]
+	autoStash = true
