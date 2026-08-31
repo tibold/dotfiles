@@ -1,0 +1,25 @@
+[credential "https://github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[user]
+	name = Tibold Kandrai
+	email = tibold@kandrai.eu
+
+# Diffs through delta, matching the pager the lazygit config already uses
+# (config/lazygit/config.yml). The package is git-delta; the binary is delta.
+[core]
+	pager = delta
+
+# Colour only, no pager: "git add -p" draws its own prompts and a pager would
+# swallow them.
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	dark = true
+	line-numbers = true
+	# n and N move between files and hunks rather than scrolling by page.
+	navigate = true

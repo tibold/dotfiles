@@ -30,6 +30,7 @@ log 'Link dot files and config in place'
 ln -sf "$SCRIPT_DIR/.tmux.conf" ~/.tmux.conf
 ln -sf "$SCRIPT_DIR/.bashrc" ~/.bashrc
 ln -sf "$SCRIPT_DIR/.zshrc" ~/.zshrc
+ln -sf "$SCRIPT_DIR/.gitconfig" ~/.gitconfig
 ln -sf "$SCRIPT_DIR/config/powerline-tmux.conf" ~/.config/powerline-tmux.conf
 # lazygit reads a directory rather than a flat file in ~/.config, so the
 # directory has to exist before the link goes into it.
