@@ -27,3 +27,5 @@ ripgrep-zsh-completion
 nodejs-default
 npm-default
 jq
+make
+nushell
