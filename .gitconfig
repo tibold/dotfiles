@@ -23,3 +23,13 @@
 	line-numbers = true
 	# n and N move between files and hunks rather than scrolling by page.
 	navigate = true
+
+# zdiff3 writes the common ancestor into a conflict alongside both sides, so a
+# conflict shows what the change was made against rather than only the two
+# results. Delta renders that third section; the default "merge" style gives it
+# nothing to render.
+#
+# This changes the markers written into conflicted files, so it is a working
+# change rather than only a display one.
+[merge]
+	conflictStyle = zdiff3
