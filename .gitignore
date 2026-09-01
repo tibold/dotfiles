@@ -1,3 +1,8 @@
+# An npm install that ran in the repo root instead of a project directory.
+# steps/packages.nu passes --global now, so this should not come back.
 node_modules
 package.json
 package-lock.json
+
+# Working copy of the repo that tests/container/run.nu hands to podman.
+tests/container/staging

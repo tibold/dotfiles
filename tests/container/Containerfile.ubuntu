@@ -1,0 +1,15 @@
+FROM docker.io/library/ubuntu:24.04
+
+# Without this, tzdata's post-install stops for keyboard input and the test
+# hangs rather than failing -- a much worse way to find out something is wrong.
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends sudo ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home --shell /bin/bash tester && \
+    printf 'tester ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/tester
+
+USER tester
+WORKDIR /home/tester

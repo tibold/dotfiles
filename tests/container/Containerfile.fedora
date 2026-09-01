@@ -1,0 +1,9 @@
+FROM registry.fedoraproject.org/fedora:latest
+
+RUN dnf install -y sudo shadow-utils && dnf clean all
+
+RUN useradd --create-home --shell /bin/bash tester && \
+    printf 'tester ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/tester
+
+USER tester
+WORKDIR /home/tester
