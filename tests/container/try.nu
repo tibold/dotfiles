@@ -54,7 +54,6 @@ def snapshot-revision [tag: string]: nothing -> string {
 def prepare [distro: string, tag: string, revision: string]: nothing -> nothing {
   let built = (lib build $distro $HERE)
   if not $built.ok {
-    print $built.output
     error make { msg: $"could not build the ($distro) image" }
   }
 
@@ -78,12 +77,12 @@ def prepare [distro: string, tag: string, revision: string]: nothing -> nothing 
   let args = (["run" "--name" $name] ++ (lib mounts $staging $nvim) ++ [
     $built.tag "sh" "-c" (lib install-script $nvim)
   ])
-  let result = (do { ^podman ...$args } | complete)
+  let result = (lib stream $args)
 
   rm --recursive --force $staging
 
-  if $result.exit_code != 0 {
-    print $"($result.stdout)($result.stderr)"
+  if not $result.ok {
+    # Everything the install printed has already been on screen.
     do { ^podman rm --force $name } | complete | ignore
     error make { msg: $"the install failed inside the ($distro) container" }
   }
@@ -91,8 +90,13 @@ def prepare [distro: string, tag: string, revision: string]: nothing -> nothing 
   log step $"Snapshotting as ($tag)"
   # The fingerprint rides along on the image, so the next run can tell whether
   # this snapshot still matches the repo without keeping state on the side.
-  let commit = (["commit" "--change" $"LABEL dotfiles.revision=($revision)" $name $tag])
-  do { ^podman ...$commit } | complete | ignore
+  #
+  # Deliberately not `complete | ignore`, which this once was. A commit that
+  # fails has to fail loudly: swallowed, the snapshot silently never existed
+  # and the next run reinstalled from scratch with nothing on screen to say
+  # why. Should it fail, the container is left behind and removed by the
+  # `podman rm --force` at the top of the next run.
+  ^podman commit --change $"LABEL dotfiles.revision=($revision)" $name $tag
   do { ^podman rm --force $name } | complete | ignore
 }
 

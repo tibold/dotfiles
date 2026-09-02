@@ -93,29 +93,24 @@ export PATH
 #
 # Asked directly rather than by comparing version numbers. A version floor is a
 # proxy for the real question, and one that has to be revised by hand every
-# time the scripts use something newer. This runs the newest syntax they rely
-# on and sees what happens.
+# time the scripts use something newer. So is a hand-written probe of "the
+# newest syntax we rely on": it drifts the moment a script uses something the
+# probe does not, and it did -- it let through a release the test runner could
+# not parse.
+#
+# nu-check parses install.nu and, because nushell resolves `use` at parse time,
+# every module it imports. That is the real question, asked of the real files,
+# and it needs no maintenance when the scripts change.
 #
 # It is not hypothetical: Fedora packages nushell 0.99, which installs happily
-# and then cannot parse lib/distro.nu. Extend the probe when these scripts
-# start depending on something newer.
+# and then cannot parse lib/distro.nu.
 nu_is_usable() {
   candidate="$1"
   [ -n "$candidate" ] || return 1
 
-  probe=$(mktemp)
-  cat > "$probe" <<'PROBE'
-const HERE = (path self | path dirname)
-{ a: 1 } | get --optional b | ignore
-"X" | str lowercase | ignore
-[1 2 3] | slice 1.. | ignore
-PROBE
-  if "$candidate" --no-config-file "$probe" >/dev/null 2>&1; then
-    rm -f "$probe"
-    return 0
-  fi
-  rm -f "$probe"
-  return 1
+  "$candidate" --no-config-file -c \
+    "if (nu-check '$REPO_DIR/install.nu') { exit 0 } else { exit 1 }" \
+    >/dev/null 2>&1
 }
 
 # Try the distro first, then fall back to the upstream release.

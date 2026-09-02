@@ -39,23 +39,46 @@ export def stage [repo: path]: nothing -> path {
   $dest
 }
 
-export def build [distro: string, here: path, --quiet]: nothing -> record {
+# Run podman with its output on the terminal as it happens, and a copy kept.
+#
+# Not `complete`. That returns stdout, stderr and the exit code as one value,
+# which is right for a query like `podman image exists` -- but it can only hand
+# the output over once the command has finished. Used on the install itself, a
+# five-minute run showed nothing until it was done, and a successful one showed
+# nothing at all. Here the output streams through `tee` into a file, so whoever
+# is watching sees what a shell would have shown them, and the summary at the
+# end can still quote from it. Success or failure comes from the `try`: a
+# failing external is an error in nushell, and that is all the catch needs.
+export def stream [args: list<string>]: nothing -> record {
+  let log = (mktemp --tmpdir "dotfiles-podman-XXXXXX.log")
+
+  let ok = (try {
+    ^podman ...$args o+e>| tee { save --force $log }
+    true
+  } catch { false })
+
+  let output = (open --raw $log)
+  rm --force $log
+  { ok: $ok, output: $output }
+}
+
+export def build [distro: string, here: path]: nothing -> record {
   let tag = $"dotfiles-test:($distro)"
 
   log step $"Building ($tag)"
   # Context is this directory, which holds only Containerfiles -- the repo
   # itself arrives as a mount at run time, so editing the code does not
   # invalidate the image cache.
-  let args = (["build" "--tag" $tag "--file" (containerfile $distro $here) $here])
-  let result = (do { ^podman ...$args } | complete)
+  let result = (stream ["build" "--tag" $tag "--file" (containerfile $distro $here) $here])
 
-  { tag: $tag, ok: ($result.exit_code == 0), output: $"($result.stdout)($result.stderr)" }
+  { tag: $tag, ok: $result.ok, output: $result.output }
 }
 
-# The neovim config lives in a separate, currently private repository, so a
-# container cannot clone it from GitHub. If there is a checkout on this
-# machine, mount it and clone from that instead; otherwise let the step try
-# GitHub and report whatever happens.
+# The neovim config lives in its own repository. If there is a checkout on this
+# machine, mount it and clone from that instead of from GitHub: the test then
+# exercises the config as it is here, uncommitted edits included, and does not
+# need the network for it. Without one, the step clones from GitHub as it would
+# on a real machine.
 export def nvim-source []: nothing -> string {
   let local = ($nu.home-dir | path join ".config" "nvim")
   if ($local | path join ".git" | path exists) { $local } else { "" }

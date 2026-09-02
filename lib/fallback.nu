@@ -8,8 +8,9 @@
 # we drop a single static binary into ~/.local/bin.
 #
 # The trade is explicit: these binaries do not get security updates from the
-# distro. `install.nu --only fallback` re-runs the fetch and picks up whatever
-# upstream calls latest, which is the maintenance story.
+# distro, and nothing here re-fetches one that is already on PATH. To update
+# one, delete it from ~/.local/bin and run `install.nu --only packages`, which
+# fetches whatever upstream calls latest. That is the whole maintenance story.
 
 use log.nu
 

@@ -32,9 +32,9 @@ def run-one [distro: string, staging: path, nvim: string, --keep]: nothing -> re
   let script = (lib install-script $nvim "nu tests/container/verify.nu")
   let args = (["run"] ++ $flags ++ (lib mounts $staging $nvim) ++ [$built.tag "sh" "-c" $script])
 
-  let result = (do { ^podman ...$args } | complete)
+  let result = (lib stream $args)
 
-  { distro: $distro, stage: "install", ok: ($result.exit_code == 0), output: $"($result.stdout)($result.stderr)" }
+  { distro: $distro, stage: "install", ok: $result.ok, output: $result.output }
 }
 
 def main [
