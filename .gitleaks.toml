@@ -1,0 +1,20 @@
+# Secret scanning rules for this repository, used by githooks/pre-commit.
+
+# Start from gitleaks' own rule set rather than replacing it. Everything below
+# narrows that default; nothing here weakens a rule for the whole repo.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Paths that are not ours to scan"
+
+paths = [
+  # Vendored trees. Gitignored, so they should never be staged anyway -- listed
+  # so that an accidental `git add -f` does not turn into a wall of findings
+  # about somebody else's test fixtures.
+  '''node_modules/''',
+]
+
+# Add exceptions here as they come up, each with a reason. Prefer a
+# `gitleaks:allow` comment on the specific line: it sits next to the thing it
+# excuses, so it is visible in review and disappears when the line does.

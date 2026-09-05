@@ -1,0 +1,46 @@
+#!/bin/sh
+# Refuse to commit anything that looks like a credential.
+#
+# A dotfiles repository is an unusually easy place to leak one: it is where
+# tokens, API keys and helper snippets naturally accumulate, and it is often
+# public.
+#
+# This fails CLOSED. If gitleaks is missing the commit is blocked rather than
+# waved through, because a secret scanner that quietly does nothing is worse
+# than no scanner at all -- you would go on trusting it.
+#
+# To get past a false positive, in order of preference:
+#   1. add a `gitleaks:allow` comment on the offending line
+#   2. add an entry to .gitleaksignore (commit the fingerprint it prints)
+#   3. git commit --no-verify
+# The first two leave a record; the third does not.
+
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+config="$repo_root/.gitleaks.toml"
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  cat >&2 <<'MSG'
+pre-commit: gitleaks is not installed, so staged changes cannot be scanned.
+
+  install it:  nu install.nu --only packages
+  or bypass:   git commit --no-verify   (only if you are certain)
+MSG
+  exit 1
+fi
+
+# gitleaks 8.19 replaced `protect` with `git`, and later builds dropped
+# `protect` entirely. Probe rather than assume, so the hook works against both
+# an older distro package and the current upstream binary.
+if gitleaks git --help >/dev/null 2>&1; then
+  scan="git"
+else
+  scan="protect"
+fi
+
+if ! gitleaks "$scan" --staged --redact --no-banner --config "$config"; then
+  echo "" >&2
+  echo "pre-commit: refusing to commit -- see the findings above." >&2
+  exit 1
+fi

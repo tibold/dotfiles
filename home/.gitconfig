@@ -1,0 +1,51 @@
+[user]
+	name = Tibold Kandrai
+	email = 1974659+tibold@users.noreply.github.com
+
+# Diffs through delta, matching the pager the lazygit config already uses
+# (config/lazygit/config.yml). The package is git-delta; the binary is delta.
+[core]
+	pager = delta
+
+# Colour only, no pager: "git add -p" draws its own prompts and a pager would
+# swallow them.
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	dark = true
+	line-numbers = true
+	# n and N move between files and hunks rather than scrolling by page.
+	navigate = true
+
+# zdiff3 writes the common ancestor into a conflict alongside both sides, so a
+# conflict shows what the change was made against rather than only the two
+# results. Delta renders that third section; the default "merge" style gives it
+# nothing to render.
+#
+# This changes the markers written into conflicted files, so it is a working
+# change rather than only a display one.
+[merge]
+	conflictStyle = zdiff3
+
+# Rebase on pull rather than merge, so pulling a branch that has moved does not
+# manufacture a merge commit for work that was only ever local.
+[pull]
+	rebase = true
+
+# Stash and restore a dirty tree around the rebase, so pulling does not have to
+# wait for uncommitted work to reach a committable state. The stash is reapplied
+# afterwards, and stays in the stash list if reapplying conflicts.
+[rebase]
+	autoStash = true
+[credential "https://dev.azure.com"]
+	helper = 
+	helper = git-credential-manager
+	credentialStore = plaintext
+	useHttpPath = true
+[credential "https://github.com"]
+	helper = 
+	helper = !gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !gh auth git-credential

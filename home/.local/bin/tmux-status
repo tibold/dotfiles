@@ -1,0 +1,46 @@
+#!/bin/sh
+# Numbers for the tmux status line.
+#
+# Run once every status-interval, so it is one short-lived process reading
+# /proc rather than a daemon. Everything comes from a single awk pass over
+# /proc/meminfo -- three separate greps would be three more forks, five seconds
+# apart, forever.
+#
+#   tmux-status cpu     load average over the last minute, and core count
+#   tmux-status mem     memory in use, as a percentage
+#   tmux-status swap    swap in use, as a percentage, or "-" when there is none
+#
+# Prints nothing rather than an error if /proc is not there, so a status line
+# on a system without it is merely missing a segment.
+
+set -eu
+
+case "${1:-}" in
+  cpu)
+    [ -r /proc/loadavg ] || exit 0
+    load=$(cut -d' ' -f1 /proc/loadavg)
+    # Load means little without knowing what it is being divided by: 4.0 is
+    # saturated on 4 cores and idle-ish on 32.
+    cores=$(nproc 2>/dev/null || echo '?')
+    printf '%s/%s' "$load" "$cores"
+    ;;
+
+  mem)
+    [ -r /proc/meminfo ] || exit 0
+    # MemAvailable, not MemFree: free memory excludes cache and reclaimable
+    # slab, so it reads as though a healthy machine were nearly full.
+    awk '/^MemTotal:/ {t=$2} /^MemAvailable:/ {a=$2}
+         END {if (t > 0) printf "%d%%", (t - a) * 100 / t}' /proc/meminfo
+    ;;
+
+  swap)
+    [ -r /proc/meminfo ] || exit 0
+    awk '/^SwapTotal:/ {t=$2} /^SwapFree:/ {f=$2}
+         END {if (t > 0) printf "%d%%", (t - f) * 100 / t; else printf "-"}' /proc/meminfo
+    ;;
+
+  *)
+    echo "usage: tmux-status cpu|mem|swap" >&2
+    exit 2
+    ;;
+esac

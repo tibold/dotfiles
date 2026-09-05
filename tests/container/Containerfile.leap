@@ -1,0 +1,11 @@
+FROM registry.opensuse.org/opensuse/leap:15.6
+
+RUN zypper --non-interactive refresh && \
+    zypper --non-interactive install sudo shadow && \
+    zypper clean --all
+
+RUN useradd --create-home --shell /bin/bash tester && \
+    printf 'tester ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/tester
+
+USER tester
+WORKDIR /home/tester

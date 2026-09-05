@@ -1,0 +1,15 @@
+# Deliberately minimal: sudo and a normal user, nothing else.
+#
+# Everything this environment needs is bootstrap.sh's job, so pre-installing
+# any of it here would hide exactly the failures these tests exist to catch.
+FROM registry.opensuse.org/opensuse/tumbleweed:latest
+
+RUN zypper --non-interactive refresh && \
+    zypper --non-interactive install sudo shadow && \
+    zypper clean --all
+
+RUN useradd --create-home --shell /bin/bash tester && \
+    printf 'tester ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/tester
+
+USER tester
+WORKDIR /home/tester

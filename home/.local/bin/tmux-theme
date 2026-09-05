@@ -1,0 +1,51 @@
+#!/bin/sh
+# Switch the tmux status line theme, on a running server.
+#
+#   tmux-theme            list the available themes
+#   tmux-theme gruvbox    apply it now
+#
+# Applying is not permanent: tmux keeps the palette in server options, so it
+# lasts until the server exits. Once you have picked one, put its name on the
+# source-file line in ~/.tmux.conf.
+
+set -eu
+
+themes_dir="${XDG_CONFIG_HOME:-$HOME/.config}/tmux/themes"
+
+if [ ! -d "$themes_dir" ]; then
+  echo "tmux-theme: no themes in $themes_dir" >&2
+  exit 1
+fi
+
+list() {
+  for f in "$themes_dir"/*.conf; do
+    [ -e "$f" ] || continue
+    name=$(basename "$f" .conf)
+    # The first comment line of each file describes it.
+    description=$(sed -n '1s/^# *//p' "$f")
+    printf '%-12s %s\n' "$name" "$description"
+  done
+}
+
+if [ $# -eq 0 ]; then
+  list
+  exit 0
+fi
+
+theme="$themes_dir/$1.conf"
+
+if [ ! -r "$theme" ]; then
+  echo "tmux-theme: no such theme: $1" >&2
+  echo "" >&2
+  list >&2
+  exit 1
+fi
+
+if ! tmux has-session 2>/dev/null; then
+  echo "tmux-theme: no tmux server running -- start one first" >&2
+  exit 1
+fi
+
+tmux source-file "$theme"
+tmux refresh-client -S 2>/dev/null || true
+echo "applied $1 (edit ~/.tmux.conf to keep it)"
