@@ -26,6 +26,15 @@ export const OVERRIDES = {
 
   fzf: ["fzf" "fzf-tmux" "fzf-zsh-integration" "vim-fzf"]
   ripgrep: ["ripgrep" "ripgrep-bash-completion" "ripgrep-zsh-completion"]
+
+  # One package per plugin, built from the same source as the nushell package
+  # so the versions always agree. Kept in step with NUSHELL_PLUGINS in
+  # common.nu by tests/unit/plugins.nu.
+  nushell-plugins: [
+    nushell-plugin_formats
+    nushell-plugin_query
+    nushell-plugin_inc
+  ]
 }
 
 export const EXTRA = [

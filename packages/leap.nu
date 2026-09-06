@@ -10,6 +10,7 @@ export const OVERRIDES = {
   git-delta: null
   gitleaks: null
   nushell: null
+  nushell-plugins: null
 
   # Leap's repos have no Nerd Font package under any name.
   nerd-fonts: null

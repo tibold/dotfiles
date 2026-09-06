@@ -11,6 +11,7 @@ const REPO = (path self | path dirname | path dirname | path dirname)
 use ../../lib/links.nu
 use ../../lib/distro.nu
 use ../../lib/packages.nu
+use ../../packages/common.nu
 
 # Binaries that must be on PATH afterwards, whatever route they arrived by --
 # a distro package on one system, an upstream release on another. Written as
@@ -88,9 +89,12 @@ def main [] {
   # interactive session prints "closing brace expected" before every line,
   # because the theme only expands its fill when it has a real width to fill.
   # `script` supplies the pty that makes the difference.
-  let rendered = (do {
-    ^script --quiet --return --command "zsh -il" /dev/null
-  } | complete)
+  #
+  # Fed an `exit` on stdin, because a shell on a pty waits for input and
+  # `script` only closes the pty when its own stdin ends. Under `podman run`
+  # from a captured `complete` that never happens, and this check sat for
+  # half an hour behind a zsh that was doing exactly what it was told.
+  let rendered = ("exit\n" | ^script --quiet --return --command "zsh -il" /dev/null | complete)
   let complaints = ($"($rendered.stdout)($rendered.stderr)"
     | lines
     | where {|l| $l =~ '(?i)zsh:.*(expected|bad|error|not found)' })
@@ -179,6 +183,32 @@ def main [] {
   $results = ($results | append (check "lazygit runs"
     ($lazygit_run.exit_code == 0)
     ($lazygit_run.stderr | str trim)))
+
+  # --- nushell plugins ---------------------------------------------------------
+  #
+  # Asked of a fresh nu, not of this one: this process was started with
+  # whatever registry existed when it launched, and a plugin registered
+  # during the install only shows up in the next one. `from ini` is the
+  # command that was found missing, so it is the one exercised.
+  let registered = (do { ^nu -c "plugin list --registry | get name | str join ' '" } | complete)
+  let names = ($registered.stdout | str trim | split row " ")
+  let unregistered = ($common.NUSHELL_PLUGINS | where {|p| $p not-in $names })
+  $results = ($results | append (check "every nushell plugin is registered"
+    (($registered.exit_code == 0) and ($unregistered | is-empty))
+    $"not registered: ($unregistered | str join ', ') ($registered.stderr | str trim)"))
+
+  let ini = (do { ^nu -c "'[section]\nkey = value' | from ini | get section.key" } | complete)
+  $results = ($results | append (check "from ini works in a new nu"
+    (($ini.exit_code == 0) and (($ini.stdout | str trim) == "value"))
+    ($"($ini.stdout)($ini.stderr)" | str trim)))
+
+  # The writer is ours, from home/.config/nushell/scripts. Loaded by name, as
+  # a script would, which also proves the link landed on nushell's library
+  # path and not just somewhere under ~/.config.
+  let writer = (do { ^nu -c "use ini.nu *; { s: { k: v } } | to ini" } | complete)
+  $results = ($results | append (check "to ini is on nushell's library path"
+    (($writer.exit_code == 0) and (($writer.stdout | str trim) == "[s]\nk=v"))
+    ($"($writer.stdout)($writer.stderr)" | str trim)))
 
   # --- the secret scanning hook -------------------------------------------------
   # Only meaningful if the copy under test is a real checkout; the step

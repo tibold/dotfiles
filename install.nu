@@ -15,14 +15,16 @@ use lib/log.nu
 use lib/distro.nu
 use lib/links.nu
 use steps/packages.nu
+use steps/plugins.nu
 use steps/cleanup.nu
 use steps/zsh.nu
 use steps/neovim.nu
 use steps/githooks.nu
 
 # Order matters. Packages come first because later steps need the tools they
-# install -- git for the clones, gitleaks for the hook check.
-const STEPS = ["packages" "cleanup" "links" "zsh" "neovim" "hooks"]
+# install -- git for the clones, gitleaks for the hook check, the plugin
+# binaries for the registration.
+const STEPS = ["packages" "plugins" "cleanup" "links" "zsh" "neovim" "hooks"]
 
 def parse-only [only: string]: nothing -> list<string> {
   if ($only | is-empty) { return $STEPS }
@@ -66,6 +68,7 @@ def main [
   for step in $steps {
     match $step {
       "packages" => (packages install $system --bin-dir $bin_dir --dry-run=$dry_run)
+      "plugins" => (plugins install --home $target --bin-dir $bin_dir --dry-run=$dry_run)
       "cleanup" => (cleanup install $system --dry-run=$dry_run)
       "links" => {
         log step (if $copy { "Copying dotfiles into place" } else { "Linking dotfiles into place" })

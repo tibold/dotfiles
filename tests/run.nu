@@ -41,6 +41,17 @@ def discover [file: path]: nothing -> list<string> {
 # which is why the tests read as sentences.
 const UNSAFE = "[\"'();|$]"
 
+# Words that nushell reads as something other than a command when they come
+# first: a literal, a keyword, a declaration. A test called "null is an empty
+# value" does not call a command named `null is ...`; it evaluates `null`,
+# then chokes on `is` as an operator, and the error points into the generated
+# driver rather than at the test. Caught here by name instead.
+const RESERVED_FIRST = [
+  "null" "true" "false"
+  "let" "mut" "const" "def" "use" "export" "source" "alias" "module"
+  "if" "else" "match" "for" "while" "loop" "break" "continue" "return" "try" "catch" "do"
+]
+
 # Build a script that calls every test in the module and reports what happened.
 def run-module [file: path]: nothing -> table {
   let names = (try {
@@ -57,6 +68,18 @@ def run-module [file: path]: nothing -> table {
         module: ($file | path basename)
         name: $n
         error: "this test name contains a quote or a shell metacharacter, which the runner cannot call -- rename it using plain words"
+        output: ""
+      }
+    })
+  }
+
+  let reserved = ($names | where {|n| ($n | split row " " | first) in $RESERVED_FIRST })
+  if ($reserved | is-not-empty) {
+    return ($reserved | each {|n|
+      {
+        module: ($file | path basename)
+        name: $n
+        error: $"this test name starts with `($n | split row ' ' | first)`, which nushell reads as a literal or keyword rather than a command -- start it with another word"
         output: ""
       }
     })

@@ -64,6 +64,12 @@ export const PACKAGES = [
   # -- Shell of choice for this repo's own scripts --
   nushell
 
+  # nushell keeps its less common commands out of the binary: `from ini`,
+  # `query json` and `inc` are plugins, shipped as separate
+  # executables and unknown to the shell until registered. See NUSHELL_PLUGINS
+  # below for which ones, and steps/plugins.nu for the registration.
+  nushell-plugins
+
   # -- Odds and ends --
   mkisofs
 ]
@@ -77,4 +83,24 @@ export const PIPX = [
 # neovim's node provider, which has no distro package worth relying on.
 export const NPM = [
   neovim
+]
+
+# The nushell plugins to register, by their short name: the binary is
+# nu_plugin_NAME, and openSUSE's package is nushell-plugin_NAME.
+#
+# The list is spelled out again in packages/suse.nu and lib/fallback.nu, because
+# a const cannot be derived from another with `each`; tests/unit/plugins.nu
+# holds all three to this one.
+#
+#   formats   from ini, from eml, from ics, from vcf, from plist
+#   query     query json / xml / web, against files and pages
+#   inc       bump a semver string or a number
+#
+# polars, the dataframe plugin, is deliberately not here: a 120 MB binary for
+# a library nothing in this environment uses. Add it to this list if that
+# changes -- the packaging on both sides follows the same naming.
+export const NUSHELL_PLUGINS = [
+  formats
+  query
+  inc
 ]

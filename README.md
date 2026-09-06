@@ -26,8 +26,8 @@ packages/         What to install. common.nu is one logical name per tool;
                   the others map those names onto each distribution.
 lib/              distro detection, package resolution, linking, and the
                   upstream-release fallback. No side effects except in apply.
-steps/            The parts of an install: packages, cleanup, links, zsh,
-                  neovim, git hooks.
+steps/            The parts of an install: packages, nushell plugins,
+                  cleanup, links, zsh, neovim, git hooks.
 tools/            Standalone utilities, not run by the installer.
 githooks/         Enabled via core.hooksPath; currently a gitleaks scan.
 tests/            unit tests (fast) and container tests (slow, real).
@@ -97,6 +97,25 @@ for one of two ways:
 
 `tests/unit/packages.nu` fails if a tool is nulled and neither applies, so a
 tool cannot quietly disappear from one distribution's environment.
+
+## Nushell plugins
+
+`from ini`, `query json` and `inc` are not built into nushell; each is
+a separate `nu_plugin_*` executable that the shell ignores until it is written
+into the per-user plugin registry. The list lives in `NUSHELL_PLUGINS` in
+`packages/common.nu`. Tumbleweed installs them as `nushell-plugin_*` packages;
+everywhere else they come out of the same upstream archive as `nu`. The
+`plugins` step then registers whichever ones are installed, and every nu
+started after that has them.
+
+`polars` is left out on purpose -- a 120 MB binary for a dataframe library
+nothing here uses. Adding a plugin is one line in that list; the openSUSE
+override and the fallback entry restate it, and `tests/unit/plugins.nu` fails
+until all three agree.
+
+The plugin only reads ini; nushell has no `to ini` at all. One lives in
+`home/.config/nushell/scripts/ini.nu`, and `autoload/formats.nu` next to it
+loads it into every interactive nu. A script gets it with `use ini.nu *`.
 
 ## Tests
 

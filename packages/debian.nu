@@ -17,6 +17,7 @@ export const OVERRIDES = {
   lazygit: null
   gitleaks: null
   nushell: null
+  nushell-plugins: null
 }
 
 export const EXTRA = [

@@ -20,6 +20,7 @@ export const OVERRIDES = {
   # it finds and falls back to the upstream release, so nothing is asked of dnf
   # here.
   nushell: null
+  nushell-plugins: null
 }
 
 export const EXTRA = []

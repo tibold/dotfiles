@@ -31,6 +31,19 @@ export const SOURCES = {
     }
     binaries: ["nu"]
   }
+  # The same archive as nushell -- upstream ships every plugin alongside the
+  # shell -- picked over for the plugin executables instead. A second entry
+  # rather than more binaries on the first, so that a machine bootstrap.sh
+  # already gave a `nu` does not refetch it to get the plugins. Kept in step
+  # with NUSHELL_PLUGINS in packages/common.nu by tests/unit/plugins.nu.
+  nushell-plugins: {
+    repo: "nushell/nushell"
+    assets: {
+      x86_64: "nu-{version}-x86_64-unknown-linux-gnu.tar.gz"
+      aarch64: "nu-{version}-aarch64-unknown-linux-gnu.tar.gz"
+    }
+    binaries: ["nu_plugin_formats" "nu_plugin_query" "nu_plugin_inc"]
+  }
   lazygit: {
     repo: "jesseduffield/lazygit"
     assets: {
@@ -133,7 +146,11 @@ export def install [
     return
   }
 
-  let present = ($source.binaries | all {|b| (which $b | is-not-empty) })
+  # On PATH, or already in bin-dir: bin-dir is where this puts things, and the
+  # session running the install often does not have it on PATH yet.
+  let present = ($source.binaries | all {|b|
+    (which $b | is-not-empty) or ($bin_dir | path join $b | path exists)
+  })
   if $present and (not $force) {
     log skipped $"($tool) already on PATH"
     return
