@@ -262,3 +262,41 @@ export def "copy mode backs up a file it is about to overwrite" [] {
 
   cleanup $f
 }
+
+@test
+export def "a platform directory is mirrored the same way home is" [] {
+  # The generic half of the per-system mechanism: platform/<name>/ has no
+  # rules of its own, it is the same mirror as home/ pointed at a different
+  # directory. Nothing about git, or about any particular setting, lives in
+  # the linking code.
+  let base = (mktemp --directory --tmpdir "dotfiles-links-XXXXXX")
+  let root = ($base | path join "repo")
+  let home = ($base | path join "home")
+
+  mkdir ($root | path join "home")
+  mkdir ($root | path join "platform" "macos" ".config" "git")
+  "shared" | save ($root | path join "home" ".gitconfig")
+  "mac only" | save ($root | path join "platform" "macos" ".config" "git" "platform.conf")
+  mkdir $home
+
+  let shared = (links plan --root $root --home $home)
+  assert equal ($shared | get relative) [".gitconfig"] "the home plan should not see the platform tree"
+
+  let mac = (links plan --root $root --home $home --from ("platform/macos"))
+  assert equal ($mac | get relative) [".config/git/platform.conf"]
+  assert equal ($mac | first | get target) ($home | path join ".config" "git" "platform.conf")
+
+  rm --recursive --force $base
+}
+
+@test
+export def "a platform directory that does not exist is an error worth seeing" [] {
+  # Not silently empty. A misspelled directory would otherwise link nothing
+  # and report nothing, which is the failure this mechanism is most prone to.
+  let base = (mktemp --directory --tmpdir "dotfiles-links-XXXXXX")
+  mkdir ($base | path join "repo" "home")
+
+  assert error {|| links plan --root ($base | path join "repo") --home $base --from "platform/nope" }
+
+  rm --recursive --force $base
+}

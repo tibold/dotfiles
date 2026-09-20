@@ -25,6 +25,9 @@ home/             Mirrors $HOME. Every file here is linked to the same
                   becomes ~/.config/lazygit/config.yml. There is no manifest;
                   adding a config means adding a file.
 
+platform/         The same mirror, per system. platform/macos/.config/... is
+                  linked only on macOS. See "Per-system settings".
+
 packages/         What to install. common.nu is one logical name per tool;
                   the others map those names onto each system.
 lib/              system detection, package resolution, linking, and the
@@ -180,6 +183,55 @@ in `packages/macos.nu` is checked by the unit tests for internal consistency and
 by running the installer on a real Mac for everything else. `--dry-run` prints
 the exact `brew install` line without touching anything, which is the closest
 thing to a rehearsal available here.
+
+## Per-system settings
+
+`home/` is linked everywhere. `platform/<name>/` is the same mirror, linked
+only where `<name>` matches the machine:
+
+```
+platform/macos/.config/git/platform.conf   ->  ~/.config/git/platform.conf, on macOS only
+platform/linux/...                             on anything that is not macOS
+platform/debian/...                            on Debian and Ubuntu
+platform/ubuntu/...                            on Ubuntu alone
+```
+
+Three names can match, and they are linked from broad to exact -- the
+operating system, then the package manager family, then the distribution -- so
+a file in `platform/ubuntu/` wins over the same path in `platform/debian/`.
+On macOS all three names are `macos`, which collapses to one.
+
+It is the same code as `home/`, pointed at a different directory: there are no
+rules of its own to learn, and `--dry-run`, the backups and the dead-link
+pruning all behave identically. Linking is one step rather than two because
+pruning has to see every link this repo owns at once; done per directory, each
+pass would tidy away the others.
+
+This exists for the file formats that have no condition of their own. git is
+the case in hand: `includeIf` can ask about a directory, a branch or a remote,
+but not about which machine it is running on. What it does have is that an
+`[include]` naming a file that does not exist is silently ignored -- so the
+file's existence becomes the condition, and this step is what decides it:
+
+```gitconfig
+# home/.gitconfig, last so it overrides what is above
+[include]
+	path = ~/.config/git/platform.conf
+```
+
+The first use is the credential store. `home/.gitconfig` asks for `plaintext`,
+which is the honest answer on a headless Linux box -- there is no secret
+service to talk to, and the credentials go to `~/.gcm/store` unencrypted.
+macOS has the Keychain, so `platform/macos/` puts it back:
+
+```gitconfig
+[credential "https://dev.azure.com"]
+	credentialStore = keychain
+```
+
+A misspelled directory -- `platform/darwin/`, say -- would link nothing and
+say nothing, so `tests/unit/configs.nu` fails on any name that cannot match a
+system this repo supports.
 
 ## macOS
 

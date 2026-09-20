@@ -48,6 +48,45 @@ def parse-only [only: string]: nothing -> list<string> {
   $STEPS | where {|s| $s in $wanted }
 }
 
+# home/, then whichever platform/ directories match this machine.
+#
+# One step rather than two, and not by preference: pruning has to see every
+# link this repo is about to own at once. Pruned after linking home/ alone, a
+# link belonging to a platform directory looks abandoned; pruned per directory,
+# each pass would tidy away the others.
+#
+# Applied in the order `config-names` returns -- linux, then the family, then
+# the distribution -- so the more specific directory's file lands last and
+# wins. See lib/distro.nu for what that order means.
+def link-everything [
+  system: record
+  --root: path
+  --home: path
+  --copy
+  --dry-run
+]: nothing -> nothing {
+  log step (if $copy { "Copying dotfiles into place" } else { "Linking dotfiles into place" })
+
+  let sources = (["home"] ++ (distro config-names $system
+    | each {|name| ["platform" $name] | path join }
+    | where {|dir| ($root | path join $dir) | path exists }))
+
+  let plans = $sources | each {|dir|
+    if $dir != "home" { log info $"($dir) \(this system only)" }
+    let plan = (links plan --root $root --home $home --from $dir --copy=$copy)
+    links apply $plan --copy=$copy --dry-run=$dry_run --backup-root ($home | path join ".dotfiles-backup")
+    { dir: $dir, targets: ($plan | get target) }
+  }
+
+  # After linking, not before: a link that is about to be repointed is not
+  # stale, it is just out of date. `managed` is every directory's targets, for
+  # the reason in the comment above.
+  let managed = ($plans | get targets | flatten)
+  for entry in $plans {
+    links prune (links stale --root $root --home $home --from $entry.dir --managed $managed) --dry-run=$dry_run
+  }
+}
+
 def main [
   --only: string = ""     # comma-separated subset of the steps to run
   --copy                  # copy files into place instead of symlinking them
@@ -83,15 +122,7 @@ def main [
       "packages" => (packages install $system --bin-dir $bin_dir --dry-run=$dry_run)
       "plugins" => (plugins install --home $target --bin-dir $bin_dir --dry-run=$dry_run)
       "cleanup" => (cleanup install $system --dry-run=$dry_run)
-      "links" => {
-        log step (if $copy { "Copying dotfiles into place" } else { "Linking dotfiles into place" })
-        let plan = (links plan --root $root --home $target --copy=$copy)
-        links apply $plan --copy=$copy --dry-run=$dry_run --backup-root ($target | path join ".dotfiles-backup")
-
-        # After linking, not before: a link that is about to be repointed is
-        # not stale, it is just out of date.
-        links prune (links stale --root $root --home $target --managed ($plan | get target)) --dry-run=$dry_run
-      }
+      "links" => (link-everything $system --root $root --home $target --copy=$copy --dry-run=$dry_run)
       "zsh" => (zsh install --home $target --dry-run=$dry_run)
       "neovim" => {
         if ($nvim_repo | is-empty) {

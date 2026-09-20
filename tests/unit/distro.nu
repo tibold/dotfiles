@@ -183,3 +183,22 @@ export def "a cask adopts what is already there rather than overwriting it" [] {
   assert str contains $command "--adopt"
   assert not ($command | str contains "--force")
 }
+
+# --- platform directories -----------------------------------------------------
+
+@test
+export def "a platform directory is matched from broad to exact" [] {
+  # The order is the whole mechanism: linked in this sequence, a file in the
+  # more specific directory lands last and wins over the same path in a
+  # broader one.
+  assert equal (distro config-names { id: "ubuntu", family: "debian" }) ["linux" "debian" "ubuntu"]
+  assert equal (distro config-names { id: "opensuse-leap", family: "suse" }) ["linux" "suse" "opensuse-leap"]
+  assert equal (distro config-names { id: "fedora", family: "fedora" }) ["linux" "fedora"]
+}
+
+@test
+export def "macOS collapses to a single platform name" [] {
+  # os, family and id are all "macos" there, and linking the same directory
+  # three times would back up its own link on the second pass.
+  assert equal (distro config-names { id: "macos", family: "macos" }) ["macos"]
+}

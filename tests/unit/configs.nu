@@ -4,6 +4,7 @@
 # the install succeeds, and the shell is subtly wrong.
 
 use ../../steps/zsh.nu
+use ../../lib/distro.nu
 use ../../packages/common.nu
 use std/testing *
 use std/assert
@@ -307,5 +308,42 @@ export def "every credential helper the gitconfig names is a tool this repo inst
     assert not ($helper | str starts-with "/") $"($helper) is an absolute path, which only exists on the machine it was written on -- name the command and let PATH find it"
 
     assert ($helper in $common.PACKAGES) $"($helper) is configured as a credential helper but is not in packages/common.nu, so nothing installs it"
+  }
+}
+
+@test
+export def "the gitconfig includes the platform file" [] {
+  # git has no condition for "which system is this", but it does ignore an
+  # include whose file is absent -- so the file's existence is the condition,
+  # and the links step decides it. Losing this line silently drops every
+  # per-system git setting.
+  let rc = (open --raw ($REPO | path join "home" ".gitconfig"))
+  assert str contains $rc "~/.config/git/platform.conf" "nothing includes the platform file"
+
+  # Last, so it overrides what came before. Anything after it would win over
+  # the per-system settings, which is the opposite of the point.
+  let lines = ($rc | lines | where {|l| ($l | str trim | is-not-empty) and (not ($l | str trim | str starts-with "#")) })
+  assert str contains ($lines | last) "platform.conf" $"the include is not the last thing in .gitconfig; found: ($lines | last)"
+}
+
+@test
+export def "every platform directory is a name that can match a machine" [] {
+  # A typo here fails silently and completely: platform/darwin/ or
+  # platform/osx/ would simply never be linked, and the settings in it would
+  # never apply, with nothing on screen to say so.
+  let dirs = (glob ($REPO | path join "platform" "*") --no-file
+    | each {|d| $d | path basename })
+
+  let matchable = ([
+    { id: "opensuse-tumbleweed", family: "suse" }
+    { id: "opensuse-leap", family: "suse" }
+    { id: "fedora", family: "fedora" }
+    { id: "ubuntu", family: "debian" }
+    { id: "debian", family: "debian" }
+    { id: "macos", family: "macos" }
+  ] | each {|s| distro config-names $s } | flatten | uniq)
+
+  for dir in $dirs {
+    assert ($dir in $matchable) $"platform/($dir) matches no system this repo supports, so it would never be linked -- expected one of: ($matchable | str join ', ')"
   }
 }

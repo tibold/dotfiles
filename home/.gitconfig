@@ -49,3 +49,15 @@
 [credential "https://gist.github.com"]
 	helper = 
 	helper = !gh auth git-credential
+
+# Settings that only apply to one kind of machine.
+#
+# git has no condition for this: includeIf can ask about a directory, a branch
+# or a remote, but not about which system it is running on. What it does have
+# is that an include naming a file that does not exist is silently ignored --
+# so the file's existence is the condition, and the links step is what decides
+# it, from platform/<name>/ in this repo.
+#
+# Last, so anything in it overrides what is above.
+[include]
+	path = ~/.config/git/platform.conf

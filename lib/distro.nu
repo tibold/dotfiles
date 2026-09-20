@@ -125,6 +125,30 @@ export def detect [--file: path = "/etc/os-release"]: nothing -> record {
   describe (parse-os-release (open --raw $file))
 }
 
+# The names a platform directory can carry for this system, least specific
+# first.
+#
+# platform/<name>/ mirrors $HOME exactly the way home/ does, and is linked only
+# where <name> matches the machine. Three names can match, from broad to exact:
+#
+#   linux, macos                      the operating system
+#   debian, suse, fedora, macos       the package manager family
+#   ubuntu, opensuse-leap, macos      the distribution itself
+#
+# Returned in that order, and applied in it, so a file in the more specific
+# directory wins over the same path in a broader one. On macOS all three are
+# "macos", which collapses to a single entry.
+#
+# This is what makes a per-system setting possible at all for the file formats
+# that have no condition of their own. git is the case in hand: includeIf can
+# ask about a directory, a branch or a remote, but not about which machine it
+# is running on -- while a plain `[include] path` of a file that does not exist
+# is silently ignored. So the platform directory decides which file exists.
+export def config-names [system: record]: nothing -> list<string> {
+  let os = (if $system.family == "macos" { "macos" } else { "linux" })
+  [$os, $system.family, $system.id] | uniq
+}
+
 # argv to refresh the package index before installing.
 #
 # Only apt genuinely requires this -- it will fail to find packages that exist

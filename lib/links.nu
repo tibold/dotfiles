@@ -46,9 +46,10 @@ def classify [source: path, target: path]: nothing -> string {
 export def plan [
   --root: path        # repo root
   --home: path        # destination root, normally $nu.home-path
+  --from: string = "home"  # repo-relative directory to mirror
   --copy              # plan copies rather than symlinks
 ]: nothing -> table {
-  let source_root = ($root | path join "home")
+  let source_root = ($root | path join $from)
 
   if not ($source_root | path exists) {
     error make { msg: $"($source_root) does not exist -- is --root the repo root?" }
@@ -175,9 +176,10 @@ def place [row: record, --copy]: nothing -> nothing {
 export def stale [
   --root: path
   --home: path
+  --from: string = "home"
   --managed: list<path> = []
 ]: nothing -> table {
-  let source_root = ($root | path join "home")
+  let source_root = ($root | path join $from)
 
   let search = (glob ($source_root | path join "**" "*") --no-file
     | append $source_root
