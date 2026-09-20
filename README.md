@@ -33,7 +33,8 @@ packages/         What to install. common.nu is one logical name per tool;
 lib/              system detection, package resolution, linking, and the
                   upstream-release fallback. No side effects except in apply.
 steps/            The parts of an install: packages, nushell plugins,
-                  cleanup, links, zsh, neovim, git hooks, macOS defaults.
+                  cleanup, links, app config dirs, zsh, neovim, git hooks,
+                  macOS defaults.
 tools/            Standalone utilities, not run by the installer. These are
                   Linux-only; they configure GDM, KVM, WireGuard and RKE2.
 githooks/         Enabled via core.hooksPath; currently a gitleaks scan.
@@ -183,6 +184,27 @@ in `packages/macos.nu` is checked by the unit tests for internal consistency and
 by running the installer on a real Mac for everything else. `--dry-run` prints
 the exact `brew install` line without touching anything, which is the closest
 thing to a rehearsal available here.
+
+## Applications that keep their config elsewhere
+
+Everything here lives under `home/.config/<app>/`, so there is one place to
+look. Some applications then read it from somewhere else, and they disagree
+with each other about where:
+
+```
+lazygit   ~/.config on Linux, ~/Library/Application Support on macOS
+nushell   the same split
+rio       ~/.config even on macOS, %LOCALAPPDATA% on Windows
+git       ~/.gitconfig everywhere, Windows included
+```
+
+`steps/appdirs.nu` lists the ones that deviate and links the config a second
+time, into the directory that application actually opens. The copy under
+`~/.config` stays, so configs remain findable in one place.
+
+Files, never the whole directory: applications keep state next to their config
+-- lazygit writes `github_pull_requests.json` there, nushell its history and
+plugin registry -- and linking the directory would drag all of it in here.
 
 ## Per-system settings
 

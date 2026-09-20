@@ -21,6 +21,7 @@ use steps/zsh.nu
 use steps/neovim.nu
 use steps/githooks.nu
 use steps/macos.nu
+use steps/appdirs.nu
 
 # Order matters. Packages come first because later steps need the tools they
 # install -- git for the clones, gitleaks for the hook check, the plugin
@@ -30,7 +31,7 @@ use steps/macos.nu
 # platform-specific one so that `--only macos` is a name the parser recognises
 # everywhere, and answers "that step only applies to macOS" rather than
 # "unknown step".
-const STEPS = ["packages" "plugins" "cleanup" "links" "zsh" "neovim" "hooks" "macos"]
+const STEPS = ["packages" "plugins" "cleanup" "links" "appdirs" "zsh" "neovim" "hooks" "macos"]
 
 def parse-only [only: string]: nothing -> list<string> {
   if ($only | is-empty) { return $STEPS }
@@ -123,6 +124,10 @@ def main [
       "plugins" => (plugins install --home $target --bin-dir $bin_dir --dry-run=$dry_run)
       "cleanup" => (cleanup install $system --dry-run=$dry_run)
       "links" => (link-everything $system --root $root --home $target --copy=$copy --dry-run=$dry_run)
+      # After links, which is what puts the config under ~/.config in the
+      # first place; this adds the second link for the applications that read
+      # it from somewhere else.
+      "appdirs" => (appdirs install $system --root $root --home $target --copy=$copy --dry-run=$dry_run)
       "zsh" => (zsh install --home $target --dry-run=$dry_run)
       "neovim" => {
         if ($nvim_repo | is-empty) {
