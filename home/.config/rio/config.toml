@@ -1,0 +1,55 @@
+# Rio. Reference: https://rioterm.com/docs/config
+#
+# Only what differs from the defaults. Keys checked against the installed
+# 0.5.28 binary -- an unknown one is ignored rather than refused.
+#
+# Linked to ~/.config/rio, which is where Rio looks on macOS and Linux.
+# Windows reads %LOCALAPPDATA%\rio; see steps/appdirs.nu.
+
+# macOS sends neither Alt nor Meta for Option, so Alt bindings do nothing --
+# dirhistory's Alt+arrows, zsh's Alt+b and Alt+f. 'both' rather than 'left',
+# which exists to keep the right Option composing brackets on European
+# layouts; coding here happens on US and UK ones.
+option-as-alt = 'both'
+
+# tmux may stop owning the scrollback.
+scrollback-history-limit = 100000
+
+hide-mouse-cursor-when-typing = true
+
+[fonts]
+size = 14
+# The family the cask in packages/macos.nu installs. Naming one that merely
+# happens to be on this machine leaves a fresh one without the glyph range the
+# tmux separators need. "S" is the tightest line gap, "Mono" keeps every glyph
+# one cell wide. MesloLGSDZ is the same with dotted zeros.
+family = "MesloLGS Nerd Font Mono"
+
+[navigation]
+# Invisible while tmux does the multiplexing, already there if it goes.
+# "Tab" not "NativeTab", so every platform behaves alike.
+mode = "Tab"
+use-split = true
+hide-if-single = true
+
+[cursor]
+# Shape is left to zsh, which changes it per vi mode.
+blinking = false
+
+# ArchPillar cyberpunk, the same values ~/.config/tmux/themes name. split and
+# split-active match .tmux.conf's pane borders, so Rio's splits look like
+# tmux's panes.
+#
+# The sixteen ANSI colours are deliberately absent: ArchPillar defines
+# surfaces and accents, not an ANSI ramp.
+[colors]
+background = '#05060A'
+foreground = '#9094A8'
+cursor     = '#22F5A8'
+vi-cursor  = '#00E5FF'
+selection-background = '#262838'
+selection-foreground = '#E8E9F4'
+split        = '#1A1C28'
+split-active = '#22F5A8'
+tabs        = '#12131C'
+tabs-active = '#22F5A8'

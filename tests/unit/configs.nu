@@ -5,6 +5,7 @@
 
 use ../../steps/zsh.nu
 use ../../lib/distro.nu
+use ../../packages/macos.nu
 use ../../packages/common.nu
 use std/testing *
 use std/assert
@@ -346,4 +347,33 @@ export def "every platform directory is a name that can match a machine" [] {
   for dir in $dirs {
     assert ($dir in $matchable) $"platform/($dir) matches no system this repo supports, so it would never be linked -- expected one of: ($matchable | str join ', ')"
   }
+}
+
+@test
+export def "the font Rio asks for is the font this repo installs" [] {
+  # The same trap as a credential helper naming a command nothing installs:
+  # a font that happens to be on this machine would leave a fresh one falling
+  # back to whatever the system picks, silently losing the glyph range the
+  # tmux status separators are drawn from.
+  #
+  # Compared by family prefix, because a cask token and a font family are not
+  # spelled alike -- font-meslo-lg-nerd-font installs "MesloLGS Nerd Font
+  # Mono" and its siblings. Changing the cask without changing the config, or
+  # the other way round, is what this catches.
+  let rio = ($REPO | path join "home" ".config" "rio" "config.toml")
+  if not ($rio | path exists) { return }
+
+  let family = (open --raw $rio
+    | lines
+    | where {|l| $l =~ '^\s*family\s*=' }
+    | each {|l| $l | str replace --regex '^\s*family\s*=\s*' '' | str trim | str trim --char '"' }
+    | first)
+
+  let cask = ($macos.CASKS | get nerd-fonts)
+  let stem = ($cask
+    | str replace --regex '^font-' ''
+    | str replace --regex '-nerd-font$' ''
+    | str replace --all '-' '')
+
+  assert (($family | str downcase | str replace --all ' ' '') | str starts-with $stem) $"Rio asks for '($family)' but packages/macos.nu installs ($cask) -- one of the two moved without the other"
 }
