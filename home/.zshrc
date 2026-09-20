@@ -1,6 +1,30 @@
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH
 
+# Homebrew, on macOS.
+#
+# Nothing puts brew's prefix on PATH by itself -- the installer prints this line
+# and leaves you to add it somewhere. `brew shellenv` is that somewhere: it sets
+# PATH, MANPATH, INFOPATH and HOMEBREW_PREFIX, the last of which the `brew`
+# Oh My Zsh plugin below reads to find its completions.
+#
+# Both prefixes are tried because Apple Silicon installs into /opt/homebrew and
+# Intel into /usr/local, and nothing here needs to know which machine it is on.
+#
+# It has to come before Oh My Zsh is sourced, since a plugin cannot find a tool
+# that is not on PATH yet. It also comes before ~/.local/bin is prepended
+# further down, so that a binary there still wins over a Homebrew one of the
+# same name -- the same precedence every other machine here uses.
+if [[ "$OSTYPE" == darwin* ]]; then
+  for _brew_prefix in /opt/homebrew /usr/local; do
+    if [[ -x "$_brew_prefix/bin/brew" ]]; then
+      eval "$("$_brew_prefix/bin/brew" shellenv)"
+      break
+    fi
+  done
+  unset _brew_prefix
+fi
+
 # Path to your Oh My Zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
@@ -78,7 +102,30 @@ ZSH_THEME="jonathan"
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
+# Plugins that only make sense on one of these systems.
+#
+# Loading the zypper or systemctl aliases on a Mac is not harmless the way an
+# unused alias usually is: `sc-start` and friends shadow nothing, but they are
+# tab-completion noise for commands that are not installed, and the suse plugin
+# defines aliases for a package manager that is not the one here. The macOS
+# pair are the mirror image -- `brew` for its completions, `macos` for the
+# Finder and Quick Look helpers -- and are equally pointless anywhere else.
+if [[ "$OSTYPE" == darwin* ]]; then
+  os_plugins=(
+    brew  # brew completions and aliases
+    macos # ofd, pfd, cdf, quick-look, and the rest of the Finder bridges
+  )
+else
+  os_plugins=(
+    suse      # because I mostly use OpenSUSE
+    systemd   # systemctl aliases (sc-start, sc-stop, sc-status...)
+    firewalld # firewalld completions
+  )
+fi
+
 plugins=(
+  $os_plugins
+
   # -- Shell enhancements --
   zsh-autosuggestions # Ghost text suggestions from history
   zsh-completions     # Additional completion definitions
@@ -103,13 +150,10 @@ plugins=(
   terraform      # Terraform aliases (tf, tfi, tfp, tfa...)
   podman         # Podman completions
   docker-compose # Docker compose aliases (dco, dcup, dcdown...)
-  systemd        # systemctl aliases (sc-start, sc-stop, sc-status...)
 
   # -- Sysadmin --
-  suse        # because I mostly use OpenSUSE
   rsync       # rsync aliases
   systemadmin # System administration helpers
-  firewalld   # firewalld completions
 
   vi-mode                 # Visual indicator for vim bindings
   zsh-syntax-highlighting # Colors commands as you type (MUST be last)
@@ -187,6 +231,27 @@ source $ZSH/oh-my-zsh.sh
 
 alias vim=nvim
 alias vi=nvim
+
+# `docker` running podman.
+#
+# On the Linux side this comes from the podman-docker package. macOS has no
+# such formula -- podman there drives a Linux VM and ships no shim -- so the
+# part of it worth having is done here instead.
+#
+# Guarded both ways: never when a real docker is installed, because shadowing
+# it would be a genuinely confusing thing to find, and never when podman is
+# absent, because an alias to a missing command is worse than no alias.
+#
+# Tested with -x rather than with $+commands, which is true for a name zsh
+# found on PATH whether or not it leads anywhere. Uninstalling Docker Desktop
+# leaves /usr/local/bin/docker behind as a symlink into an /Applications entry
+# that is gone, and $+commands counts that as a docker -- so the alias would be
+# skipped in favour of a command that only produces "no such file or
+# directory". -x follows the link and is false when it dangles.
+if [[ "$OSTYPE" == darwin* ]] && [[ -x "${commands[podman]:-}" ]] && [[ ! -x "${commands[docker]:-}" ]]; then
+  alias docker=podman
+fi
+
 export VISUAL=nvim
 export EDITOR=nvim
 export SYSTEMD_EDITOR=nvim

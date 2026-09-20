@@ -26,6 +26,19 @@ export const PACKAGES = [
   git-delta   # lazygit and .gitconfig both page diffs through it
   gitleaks    # backs the pre-commit secret scan, see githooks/
 
+  # The credential helper .gitconfig names for dev.azure.com. Until it was
+  # added here, that host's `helper = git-credential-manager` line pointed at
+  # nothing on every machine this repo has ever set up.
+  #
+  # Deliberately not the usual `dotnet tool install -g git-credential-manager`.
+  # That works, but it makes a credential helper depend on an SDK being
+  # installed, and the machines most likely to need it are servers with no
+  # other reason to carry one. Every platform here takes a build that bundles
+  # its own runtime instead -- `includedFrameworks` in its runtimeconfig.json,
+  # which is .NET's way of saying it needs nothing on the system. Verified by
+  # running it with an empty environment and no dotnet on PATH.
+  git-credential-manager
+
   # -- Search and navigation --
   ripgrep
   fzf

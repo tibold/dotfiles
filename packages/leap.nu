@@ -23,7 +23,9 @@ export const OVERRIDES = {
   # No pythonNNN-neovim on Leap under any version prefix.
   neovim-python: null
 
-  # Leap 16.x's default python is 3.11.
+  # Versioned by design, as in the suse overlay: openSUSE has no unversioned
+  # python3-pipx. Leap 16.0 carries python313-pipx, so this is correct for the
+  # versions this repo targets -- 15.x is out of support and not tested.
   pipx: "python313-pipx"
 }
 

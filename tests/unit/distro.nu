@@ -107,3 +107,79 @@ export def "only apt needs an index refresh" [] {
   assert equal (distro refresh-command "fedora") []
   assert str contains (distro refresh-command "debian" | str join " ") "apt-get update"
 }
+
+# --- macOS --------------------------------------------------------------------
+#
+# macOS never reaches parse-os-release or family-of: it has no os-release file,
+# and detect recognises it from the running nushell before looking for one. So
+# what is worth asserting here is the record it builds instead, and that the
+# commands keyed off it do not carry Linux habits across.
+
+@test
+export def "macOS describes itself without an os-release file" [] {
+  let described = (distro describe-macos "26.6.2")
+  assert equal $described.id "macos"
+  assert equal $described.family "macos"
+  assert equal $described.manager "brew"
+  assert equal $described.version "26.6.2"
+  assert equal $described.pretty "macOS 26.6.2"
+}
+
+@test
+export def "macOS still describes itself when the version cannot be read" [] {
+  # sw_vers is one more thing that can fail, and failing to name the version is
+  # not a reason to refuse to install.
+  assert equal (distro describe-macos "").pretty "macOS"
+  assert equal (distro describe-macos "").family "macos"
+}
+
+@test
+export def "Homebrew is never elevated" [] {
+  # brew refuses to run as root, and does not need to: its prefix is owned by
+  # the user who installed it. A sudo here would not be a harmless extra, it
+  # would be a hard failure at the first package.
+  assert not ((distro install-command "macos" ["git"] | str join " ") | str contains "sudo")
+  assert not ((distro cask-install-command "macos" ["font-meslo-lg-nerd-font"] | str join " ") | str contains "sudo")
+}
+
+@test
+export def "casks are installed as casks" [] {
+  let command = (distro cask-install-command "macos" ["font-meslo-lg-nerd-font"] | str join " ")
+  assert str contains $command "brew install --cask"
+}
+
+@test
+export def "a family with no casks cannot be asked for one" [] {
+  # Reaching this from Linux means an overlay grew a CASKS entry it has no way
+  # to install, which should stop rather than be quietly dropped.
+  assert error {|| distro cask-install-command "debian" ["font-hack-nerd-font"] }
+  assert equal (distro cask-install-command "macos" []) []
+}
+
+@test
+export def "a global npm install is elevated only where the prefix needs it" [] {
+  # The distro packages put node under /usr, which needs root. Homebrew's
+  # prefix is this user's, and running npm under sudo there leaves root-owned
+  # files in it that the next un-elevated npm cannot update.
+  assert equal (distro npm-global-command "macos" ["neovim"] | first) "npm"
+  assert equal (distro npm-global-command "debian" ["neovim"] | first) "sudo"
+  assert equal (distro npm-global-command "macos" []) []
+}
+
+@test
+export def "brew needs no index refresh of its own" [] {
+  # It updates itself before an install unless told otherwise, so a `brew
+  # update` here would be the same fetch twice.
+  assert equal (distro refresh-command "macos") []
+}
+
+@test
+export def "a cask adopts what is already there rather than overwriting it" [] {
+  # A font is the thing most likely to be installed by hand already, and a cask
+  # refuses to write over files it did not place. --adopt takes over the ones
+  # that are byte-identical; --force, the other way out of that error, would
+  # overwrite a font someone chose.
+  let command = (distro cask-install-command "macos" ["font-meslo-lg-nerd-font"] | str join " ")
+  assert str contains $command "--adopt"
+  assert not ($command | str contains "--force")
+}

@@ -1,6 +1,12 @@
 FROM registry.fedoraproject.org/fedora:latest
 
-RUN dnf install -y sudo shadow-utils && dnf clean all
+# util-linux-script supplies /usr/bin/script, which is its own subpackage on
+# Fedora and absent from the base image. tests/container/verify.nu uses it to
+# run an interactive zsh under a pty -- without a terminal the prompt is never
+# drawn and the check would pass without testing anything. Missing, it stops
+# the whole run with "Command `script` not found", which reads like a bug in
+# the installer rather than a gap in this image.
+RUN dnf install -y sudo shadow-utils util-linux-script && dnf clean all
 
 RUN useradd --create-home --shell /bin/bash tester && \
     printf 'tester ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/tester

@@ -9,6 +9,10 @@
 #   list    expands to several packages
 #   null    not available; lib/fallback.nu fetches it from upstream instead
 export const OVERRIDES = {
+
+  # Not packaged by any distribution. Comes from the upstream release instead,
+  # which is a self-contained build needing no dotnet -- see lib/fallback.nu.
+  git-credential-manager: null
   terminfo-extra: "terminfo"
 
   nodejs: "nodejs-default"
@@ -39,6 +43,25 @@ export const OVERRIDES = {
 
 export const EXTRA = [
   helm-zsh-completion
+
+  # git-credential-manager's runtime dependency, and the one thing its upstream
+  # archive does not carry.
+  #
+  # That build bundles its own .NET runtime but still calls out to the system
+  # ICU for globalization, and .NET does not degrade when it is missing -- it
+  # aborts:
+  #
+  #   Couldn't find a valid ICU package installed on the system.
+  #   ... core dumped with SIGABRT (6)
+  #
+  # So the helper installs, lands on PATH, and dies the first time git asks it
+  # for a credential. Microsoft's own .deb declares no dependencies at all, so
+  # there is nothing upstream to inherit this from.
+  #
+  # "libicu" unversioned on purpose: it is a real package name on Fedora, and
+  # on openSUSE zypper resolves it as a capability to whichever libicuNN is
+  # current. Neither needs revisiting when ICU's soname moves.
+  libicu
 ]
 
 # Packages this repo used to install and no longer wants.

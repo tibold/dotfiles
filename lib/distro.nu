@@ -38,6 +38,12 @@ export def parse-os-release [text: string]: nothing -> record {
 #
 # ID_LIKE is what makes derivatives work without listing every one of them:
 # Linux Mint says ID_LIKE=ubuntu, Rocky says ID_LIKE="rhel centos fedora".
+#
+# macOS is deliberately not answerable here. It has no os-release file, so it
+# never reaches this function -- `detect` recognises it before parsing anything
+# and builds the record itself. Adding a "macos" case would be a branch nothing
+# can take, which is worse than its absence: it would read as though something
+# does.
 export def family-of [id: string, id_like: list<string>]: nothing -> string {
   let names = ([$id] ++ $id_like)
   if (($names | any {|n| $n in ["opensuse" "opensuse-leap" "opensuse-tumbleweed" "suse" "sles" "sled"]})) {
@@ -56,6 +62,7 @@ export def manager-of [family: string]: nothing -> string {
     "suse" => "zypper"
     "fedora" => "dnf"
     "debian" => "apt-get"
+    "macos" => "brew"
     _ => "unknown"
   }
 }
@@ -79,7 +86,39 @@ export def describe [os: record]: nothing -> record {
   }
 }
 
+# The same record, for macOS, which has nothing to parse.
+#
+# There is one vendor, one package manager and one name, so the only thing
+# actually read from the system is the version -- and that is taken as an
+# argument rather than run in here, so the shape of the record can be tested
+# without being on a Mac.
+#
+# "macos" is both the id and the family. The id/family split earns its keep on
+# Linux, where Leap and Tumbleweed share a package manager and disagree about
+# what is in it; there is no equivalent division here. Should one appear --
+# some future release dropping a formula this list needs -- it is the same
+# move the Leap overlay already makes: give the id its own entry in
+# lib/packages.nu and leave the family alone.
+export def describe-macos [version: string]: nothing -> record {
+  {
+    id: "macos"
+    version: $version
+    pretty: (if ($version | is-empty) { "macOS" } else { $"macOS ($version)" })
+    family: "macos"
+    manager: (manager-of "macos")
+  }
+}
+
 export def detect [--file: path = "/etc/os-release"]: nothing -> record {
+  # Asked of the running nushell rather than by looking for /etc/os-release and
+  # inferring macOS from its absence. A Linux box with an unreadable or missing
+  # os-release is a broken Linux box, and should say so, not be quietly treated
+  # as a Mac.
+  if $nu.os-info.name == "macos" {
+    let version = (do { ^sw_vers -productVersion } | complete)
+    return (describe-macos (if $version.exit_code == 0 { $version.stdout | str trim } else { "" }))
+  }
+
   if not ($file | path exists) {
     error make { msg: $"($file) does not exist -- cannot identify this system" }
   }
@@ -92,6 +131,9 @@ export def detect [--file: path = "/etc/os-release"]: nothing -> record {
 # if the lists are stale, which is the normal state of a fresh container image.
 # zypper and dnf refresh themselves as needed, so they get a no-op rather than
 # an expensive redundant sync.
+#
+# So does brew: it auto-updates before an install unless told not to, so a
+# `brew update` here would be the same fetch run twice.
 export def refresh-command [family: string]: nothing -> list<string> {
   match $family {
     "debian" => ["sudo" "apt-get" "update"]
@@ -105,6 +147,62 @@ export def install-command [family: string, packages: list<string>]: nothing -> 
     "suse" => (["sudo" "zypper" "--non-interactive" "install" "--auto-agree-with-licenses"] ++ $packages)
     "fedora" => (["sudo" "dnf" "install" "-y"] ++ $packages)
     "debian" => (["sudo" "apt-get" "install" "-y" "--no-install-recommends"] ++ $packages)
+    # No sudo, and that is not an oversight: Homebrew refuses to run as root,
+    # and does not need to -- its prefix is owned by the user who installed it.
+    # Nor is there a --yes to pass: installing a formula asks nothing.
+    "macos" => (["brew" "install"] ++ $packages)
     _ => { error make { msg: $"no install command for family '($family)'" } }
+  }
+}
+
+# Homebrew's other half.
+#
+# Casks are applications and fonts rather than command-line packages, and they
+# are installed by a different subcommand, so they cannot simply be appended to
+# the list above. Only macOS has them; anywhere else, being asked for one is a
+# bug in an overlay rather than something to paper over.
+export def cask-install-command [family: string, casks: list<string>]: nothing -> list<string> {
+  if ($casks | is-empty) { return [] }
+  match $family {
+    # --adopt, because a cask refuses to install over files it did not put
+    # there and a font is exactly the thing someone has already installed by
+    # hand:
+    #
+    #   Error: It seems there is already a Font at
+    #   '~/Library/Fonts/MesloLGLDZNerdFont-Bold.ttf'
+    #
+    # --adopt takes ownership of the artifacts that are byte-identical to the
+    # ones in the cask, which turns that into a normal install and makes a
+    # machine with the font already on it converge rather than fail.
+    #
+    # Deliberately not --force, which is the other way out of the same message:
+    # it overwrites whatever is there. Nothing else in this repo destroys a file
+    # it did not create -- that is what ~/.dotfiles-backup exists for -- and a
+    # font that is *not* identical is a font someone chose, so it should stop
+    # and say so.
+    "macos" => (["brew" "install" "--cask" "--adopt"] ++ $casks)
+    _ => { error make { msg: $"casks are a Homebrew concept -- family '($family)' has none, so this list should be empty" } }
+  }
+}
+
+# Installing a global npm package.
+#
+# Whether this needs sudo is a property of where npm's prefix is, which is a
+# property of how node was installed -- so it belongs next to the other
+# per-family commands rather than inline in the step.
+#
+# On the Linux side node comes from the distro and its prefix is /usr, which
+# needs root. Homebrew's prefix is owned by this user, and running npm under
+# sudo there writes root-owned files into it that the next un-elevated npm
+# cannot update.
+export def npm-global-command [family: string, packages: list<string>]: nothing -> list<string> {
+  if ($packages | is-empty) { return [] }
+  # -g matters wherever it runs: without it npm treats the current directory as
+  # a project and writes a node_modules tree into whatever we happen to be
+  # standing in.
+  let install = ["npm" "install" "--global"]
+  match $family {
+    "macos" => ($install ++ $packages)
+    _ => (["sudo"] ++ $install ++ $packages)
   }
 }

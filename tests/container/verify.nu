@@ -21,6 +21,12 @@ const REQUIRED = [
   "nu" "git" "zsh" "tmux" "nvim"
   "rg" "fzf" "jq" "htop" "make" "gcc"
   "lazygit" "delta" "gitleaks" "gh"
+  # No distribution packages this, so on every Linux target it arrives from the
+  # upstream release -- and by a different route to the others, because its
+  # archive has to be kept whole rather than having a single binary lifted out
+  # of it. This is the only place that route is exercised against a real
+  # download.
+  "git-credential-manager"
 ]
 
 def check [name: string, ok: bool, detail: string = ""]: nothing -> record {
@@ -183,6 +189,18 @@ def main [] {
   $results = ($results | append (check "lazygit runs"
     ($lazygit_run.exit_code == 0)
     ($lazygit_run.stderr | str trim)))
+
+  # Run, not merely found. This is the whole point of the "directory" layout in
+  # lib/fallback.nu: git-credential-manager's archive is the executable plus
+  # libSkiaSharp.so and libHarfBuzzSharp.so, which it loads from beside itself.
+  # Installing it the way every other tool here is installed -- lifting the one
+  # named binary out and discarding the rest -- puts a command on PATH that
+  # `which` finds and that dies the moment it is asked to do anything. Checking
+  # only that the binary exists would pass for both the fix and the bug.
+  let gcm_run = (do { ^git-credential-manager --version } | complete)
+  $results = ($results | append (check "git-credential-manager runs"
+    ($gcm_run.exit_code == 0)
+    ($gcm_run.stderr | str trim)))
 
   # --- nushell plugins ---------------------------------------------------------
   #

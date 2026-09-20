@@ -11,10 +11,20 @@
 # distro, and nothing here re-fetches one that is already on PATH. To update
 # one, delete it from ~/.local/bin and run `install.nu --only packages`, which
 # fetches whatever upstream calls latest. That is the whole maintenance story.
+#
+# Every asset below is a Linux build, and this is a Linux-only mechanism on
+# purpose. macOS has no use for it -- Homebrew carries every tool in
+# common.nu, so packages/macos.nu nulls nothing that is not either in the base
+# system or deliberately dropped -- and the upstream projects do not line up
+# for it anyway: delta publishes no x86_64 macOS build, and gh ships macOS as a
+# .zip, which `install` below does not unpack. Rather than grow a second set of
+# asset tables for a path that should never be taken, `install` refuses to run
+# anywhere but Linux, so a future override that nulls a formula fails loudly
+# instead of putting an ELF binary in ~/.local/bin.
 
 use log.nu
 
-# Release assets, by tool and CPU architecture.
+# Release assets, by tool and CPU architecture. Linux only -- see above.
 #
 # `{version}` is the release tag with any leading "v" removed, which is what
 # every one of these projects puts in its filenames even when the tag itself is
@@ -77,6 +87,27 @@ export const SOURCES = {
     }
     binaries: ["gh"]
   }
+  # No distribution packages this, so every Linux machine takes it from here.
+  #
+  # The usual instruction is `dotnet tool install -g git-credential-manager`,
+  # which is not used: it makes a credential helper depend on an SDK, and the
+  # machines most likely to want it are servers with no other use for one.
+  # These archives are self-contained builds -- their runtimeconfig.json
+  # declares `includedFrameworks` rather than a framework reference, meaning
+  # the .NET runtime is inside the download. Confirmed by running one with an
+  # empty environment and nothing but /usr/bin on PATH.
+  #
+  # "directory" because the archive is the binary plus libSkiaSharp.so and
+  # libHarfBuzzSharp.so, which it loads from beside itself.
+  git-credential-manager: {
+    repo: "git-ecosystem/git-credential-manager"
+    assets: {
+      x86_64: "gcm-linux-x64-{version}.tar.gz"
+      aarch64: "gcm-linux-arm64-{version}.tar.gz"
+    }
+    binaries: ["git-credential-manager"]
+    layout: "directory"
+  }
 }
 
 export def arch []: nothing -> string {
@@ -132,8 +163,80 @@ export def resolve-asset [tool: string, --arch: string]: nothing -> record {
   }
 }
 
-# Fetch one tool into bin-dir. Assumes the archive is a .tar.gz somewhere
-# inside which the binaries live; every source above is packaged that way.
+# How a tool's archive turns into an installed tool.
+#
+#   binaries   the named executables are lifted out and the rest discarded.
+#              True of every Go and Rust tool here: the archive is the binary,
+#              a licence and a README.
+#   directory  the whole archive is kept together and the binaries are linked
+#              to from bin-dir, because the executable does not work alone.
+#
+# The distinction is not cosmetic. git-credential-manager's Linux archive is
+# the binary plus libSkiaSharp.so and libHarfBuzzSharp.so, which it loads from
+# its own directory; lifting out the binary alone produces a command that runs
+# until the moment it needs to draw something and then dies.
+export def layout-of [tool: string]: nothing -> string {
+  $SOURCES | get --optional $tool | default {} | get --optional layout | default "binaries"
+}
+
+# Where a directory-layout tool lives: beside bin-dir rather than in it.
+#
+# ~/.local/bin is a directory of commands, and unpacking two hundred files of
+# .NET runtime into it would make it something else. ~/.local/share is where
+# that belongs, with a link back.
+export def share-dir [tool: string, --bin-dir: path]: nothing -> path {
+  $bin_dir | path dirname | path join "share" $tool
+}
+
+# Install a tool that has to stay in one piece.
+#
+# Exported so a test can drive it against a fabricated payload: it is the only
+# part of this file that deletes a directory, and the path it deletes is derived
+# rather than given.
+export def install-directory [
+  tool: string
+  asset: record
+  --payload: path      # where the archive was unpacked
+  --bin-dir: path
+]: nothing -> nothing {
+  # Archives disagree about whether they have a top-level directory. Both
+  # shapes are accepted rather than asserted about, because which one a project
+  # ships is not a decision this repo gets to make, and it can change between
+  # releases without anything saying so.
+  let entries = (ls --all $payload)
+  let root = (if (($entries | length) == 1) and (($entries | first | get type) == "dir") {
+    $entries | first | get name
+  } else {
+    $payload
+  })
+
+  let dest = (share-dir $tool --bin-dir $bin_dir)
+
+  # Replaced wholesale rather than merged. A half-old, half-new set of runtime
+  # files is a worse state than either version on its own, and the directory
+  # holds nothing but what a previous run of this put there.
+  rm --recursive --force $dest
+  mkdir $dest
+  ^cp -R $"($root)/." $dest
+  log ok $"($tool) -> ($dest)"
+
+  mkdir $bin_dir
+  for binary in $asset.binaries {
+    let target = ($dest | path join $binary)
+    if not ($target | path exists) {
+      error make { msg: $"($asset.name) does not contain a '($binary)' binary" }
+    }
+    ^chmod +x $target
+    let link = ($bin_dir | path join $binary)
+    # -n so an existing link to a directory is replaced rather than followed
+    # into, the same flags the dotfile links use.
+    ^ln -sfn $target $link
+    log ok $"($binary) -> ($link)"
+  }
+}
+
+# Fetch one tool into bin-dir. Every source above is a .tar.gz; what happens to
+# its contents afterwards depends on the tool's layout, above.
 export def install [
   tool: string
   --bin-dir: path
@@ -156,6 +259,15 @@ export def install [
     return
   }
 
+  # Checked here rather than at the top of the file, so that a tool which is
+  # already present is still simply skipped: this is about what would be
+  # downloaded, not about where the function was called from.
+  if $nu.os-info.name != "linux" {
+    error make {
+      msg: $"($tool) resolved to an upstream release, but every asset in lib/fallback.nu is a Linux build -- on ($nu.os-info.name) it has to come from the package manager, or be listed in that overlay's PROVIDED or OMITTED"
+    }
+  }
+
   if $dry_run {
     log info $"would fetch ($tool) from ($source.repo) into ($bin_dir)"
     return
@@ -167,12 +279,24 @@ export def install [
   let workdir = (mktemp --directory --tmpdir $"dotfiles-($tool)-XXXXXX")
   let archive = ($workdir | path join $asset.name)
 
+  # Unpacked into its own subdirectory rather than alongside the archive, so
+  # that "everything the archive contained" is a directory listing rather than
+  # a listing minus one file we happen to have put there.
+  let payload = ($workdir | path join "payload")
+  mkdir $payload
+
   http get $asset.url | save --raw --force $archive
-  ^tar --extract --gzip --file $archive --directory $workdir
+  ^tar --extract --gzip --file $archive --directory $payload
+
+  if (layout-of $tool) == "directory" {
+    install-directory $tool $asset --payload $payload --bin-dir $bin_dir
+    rm --recursive --force $workdir
+    return
+  }
 
   mkdir $bin_dir
   for binary in $source.binaries {
-    let found = (glob ($workdir | path join "**" $binary) --no-dir)
+    let found = (glob ($payload | path join "**" $binary) --no-dir)
     if ($found | is-empty) {
       rm --recursive --force $workdir
       error make { msg: $"($asset.name) does not contain a '($binary)' binary" }

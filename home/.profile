@@ -14,6 +14,18 @@ if [ -z "${PROFILEREAD:-}" ] && [ -r /etc/profile ]; then
   . /etc/profile
 fi
 
+# Homebrew, on macOS: the same thing ~/.zshrc does, for login shells that are
+# not zsh. See the longer note there.
+#
+# After /etc/profile, whose path_helper rebuilds PATH from scratch, and before
+# the ~/.local/bin line below, so that the order ends up the same as everywhere
+# else: ~/.local/bin, then Homebrew, then the system.
+if [ -x /opt/homebrew/bin/brew ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [ -x /usr/local/bin/brew ]; then
+  eval "$(/usr/local/bin/brew shellenv)"
+fi
+
 # ~/.local/bin holds pipx shims, the Claude CLI, and any tool this repo had to
 # fetch from an upstream release because the distro does not package it
 # (see lib/fallback.nu). Prepended, not appended, so those win over an older

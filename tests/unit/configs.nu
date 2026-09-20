@@ -4,6 +4,7 @@
 # the install succeeds, and the shell is subtly wrong.
 
 use ../../steps/zsh.nu
+use ../../packages/common.nu
 use std/testing *
 use std/assert
 
@@ -44,20 +45,54 @@ export def "every external plugin we install is enabled in zshrc" [] {
   }
 }
 
+# The entries of the plugins=( ... ) list, in order, comments stripped.
+#
+# One entry is `$os_plugins`, the array .zshrc fills in above the list with the
+# plugins that only make sense on this system. It is left in rather than
+# resolved: where it sits in the order is the thing worth checking.
+def plugin-list []: nothing -> list<string> {
+  zshrc
+  | lines
+  | skip until {|l| $l | str starts-with "plugins=(" }
+  | take until {|l| ($l | str trim) == ")" }
+  | each {|l| $l | str replace --regex '#.*$' '' | str trim }
+  | where {|l| ($l | is-not-empty) and (not ($l | str starts-with "plugins=(")) }
+}
+
 @test
 export def "syntax highlighting is loaded last" [] {
   # zsh-syntax-highlighting wraps the line editor and must be the final plugin;
   # anything after it silently loses highlighting.
-  let plugins = (zshrc
-    | lines
-    | skip until {|l| $l | str starts-with "plugins=(" }
-    | take until {|l| ($l | str trim) == ")" })
+  assert equal (plugin-list | last) "zsh-syntax-highlighting"
+}
 
-  let listed = ($plugins
-    | each {|l| $l | str replace --regex '#.*$' '' | str trim }
-    | where {|l| ($l | is-not-empty) and (not ($l | str starts-with "plugins=(")) })
+@test
+export def "the plugins for one system are not loaded on all of them" [] {
+  # suse, systemd and firewalld define aliases for tools that do not exist on a
+  # Mac, and brew and macos are equally pointless on Linux. They belong in the
+  # os_plugins branch above the list; finding one in the list itself means it
+  # loads everywhere.
+  let listed = (plugin-list)
 
-  assert equal ($listed | last) "zsh-syntax-highlighting"
+  assert ("$os_plugins" in $listed) "the per-system plugins are no longer spliced into the list"
+
+  for name in ["suse" "systemd" "firewalld" "brew" "macos"] {
+    assert ($name not-in $listed) $"($name) only applies to one of these systems, so it belongs in the os_plugins branch rather than the shared list"
+  }
+}
+
+@test
+export def "Homebrew reaches PATH before oh-my-zsh loads" [] {
+  # Order, like the locale test below. Oh My Zsh sources the plugins chosen
+  # above, and the brew plugin looks for its completions under HOMEBREW_PREFIX
+  # -- which `brew shellenv` is what sets. Run it afterwards and the plugin
+  # loads against an environment that does not mention Homebrew yet.
+  let lines = (zshrc | lines)
+  let shellenv = ($lines | enumerate | where {|r| $r.item =~ 'brew" shellenv' } | get index)
+  let omz = ($lines | enumerate | where {|r| $r.item =~ 'source \$ZSH/oh-my-zsh\.sh' } | get index | first)
+
+  assert ($shellenv | is-not-empty) "nothing in .zshrc puts Homebrew on PATH"
+  assert (($shellenv | math max) < $omz) $"brew shellenv runs at ($shellenv) but oh-my-zsh loads at ($omz)"
 }
 
 @test
@@ -222,5 +257,55 @@ export def "every colour the status line uses is defined by a theme" [] {
     for name in $used {
       assert ($name in $defined) $"($theme | path basename) does not define ($name), which the status line uses"
     }
+  }
+}
+
+@test
+export def "the docker alias checks that docker actually runs" [] {
+  # $+commands is true for any name zsh found on PATH, dangling symlink or not.
+  # Uninstalling Docker Desktop leaves /usr/local/bin/docker pointing into an
+  # /Applications entry that is gone, so a $+commands guard reads that as "a
+  # real docker is installed" and skips the alias in favour of a command that
+  # only ever answers "no such file or directory".
+  let rc = (zshrc)
+  let guard = ($rc | lines | where {|l| $l =~ 'commands\[docker\]' })
+
+  assert ($guard | is-not-empty) "the docker alias is no longer guarded at all"
+  for line in $guard {
+    assert ($line =~ '-x ') $"($line | str trim) tests for the name rather than for something executable"
+  }
+}
+
+@test
+export def "every credential helper the gitconfig names is a tool this repo installs" [] {
+  # The check that was missing. .gitconfig has named git-credential-manager as
+  # the helper for dev.azure.com since long before anything installed it, so on
+  # every machine this repo has ever set up, that line pointed at a command
+  # that was not there -- and git says nothing about it until the first push to
+  # Azure DevOps fails to authenticate.
+  #
+  # Helpers beginning with "!" are shell commands rather than executables to be
+  # found on PATH -- `!gh auth git-credential` is gh, already on the list -- so
+  # they are not name-checked here.
+  let helpers = (open --raw ($REPO | path join "home" ".gitconfig")
+    | lines
+    | each {|l| $l | str trim }
+    | where {|l| $l =~ '^helper\s*=' }
+    | each {|l| $l | str replace --regex '^helper\s*=\s*' '' | str trim }
+    | where {|h| ($h | is-not-empty) and (not ($h | str starts-with "!")) }
+    | each {|h| $h | split row " " | first }
+    | uniq)
+
+  assert ($helpers | is-not-empty) "no credential helper is configured at all, which is a change worth noticing"
+
+  for helper in $helpers {
+    # An absolute path is its own failure, and a likely one: `git-credential-
+    # manager configure`, which GCM's macOS installer runs for you, appends
+    # `helper = /usr/local/share/gcm-core/git-credential-manager` to the global
+    # config -- which here is this very file, by symlink. That path does not
+    # exist on Linux, so committing it breaks every other machine quietly.
+    assert not ($helper | str starts-with "/") $"($helper) is an absolute path, which only exists on the machine it was written on -- name the command and let PATH find it"
+
+    assert ($helper in $common.PACKAGES) $"($helper) is configured as a credential helper but is not in packages/common.nu, so nothing installs it"
   }
 }

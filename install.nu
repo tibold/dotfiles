@@ -20,11 +20,17 @@ use steps/cleanup.nu
 use steps/zsh.nu
 use steps/neovim.nu
 use steps/githooks.nu
+use steps/macos.nu
 
 # Order matters. Packages come first because later steps need the tools they
 # install -- git for the clones, gitleaks for the hook check, the plugin
 # binaries for the registration.
-const STEPS = ["packages" "plugins" "cleanup" "links" "zsh" "neovim" "hooks"]
+#
+# "macos" is last and only runs there. It is in this list rather than in a
+# platform-specific one so that `--only macos` is a name the parser recognises
+# everywhere, and answers "that step only applies to macOS" rather than
+# "unknown step".
+const STEPS = ["packages" "plugins" "cleanup" "links" "zsh" "neovim" "hooks" "macos"]
 
 def parse-only [only: string]: nothing -> list<string> {
   if ($only | is-empty) { return $STEPS }
@@ -52,7 +58,7 @@ def main [
   let root = $env.FILE_PWD
   let target = ($home | default $nu.home-dir)
   let bin_dir = ($target | path join ".local" "bin")
-  let steps = (parse-only $only)
+  let requested = (parse-only $only)
   let system = (distro detect)
 
   log step $"($system.pretty) \(($system.id), family ($system.family), ($system.manager))"
@@ -61,8 +67,15 @@ def main [
 
   if $system.family == "unknown" {
     error make {
-      msg: $"($system.pretty) is not a distribution this repo knows how to install on. Add an overlay in packages/ and a branch in lib/packages.nu."
+      msg: $"($system.pretty) is not a system this repo knows how to install on. Add an overlay in packages/ and a branch in lib/packages.nu."
     }
+  }
+
+  # Said only when it was asked for by name. On a Linux run with no --only,
+  # dropping a step that could never apply is not news.
+  let steps = ($requested | where {|s| $s != "macos" or $system.family == "macos" })
+  if ("macos" in $requested) and ($system.family != "macos") and ($only | is-not-empty) {
+    log skipped "macos: that step only applies to macOS"
   }
 
   for step in $steps {
@@ -88,6 +101,7 @@ def main [
         }
       }
       "hooks" => (githooks install --root $root --dry-run=$dry_run)
+      "macos" => (macos install --home $target --dry-run=$dry_run)
     }
   }
 

@@ -11,5 +11,22 @@ RUN zypper --non-interactive refresh && \
 RUN useradd --create-home --shell /bin/bash tester && \
     printf 'tester ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/tester
 
+# The socket directory systemd-tmpfiles would have made at boot.
+#
+# openSUSE builds tmux with its default socket directory at /run/tmux/$UID, and
+# ships /usr/lib/tmpfiles.d/tmux.conf so that systemd creates it. A container
+# has no systemd, so nothing does, and tmux refuses to start at all:
+#
+#   couldn't create directory /run/tmux/1000 (No such file or directory)
+#
+# Created here rather than worked around in home/.zshrc. Exporting TMUX_TMPDIR
+# from an interactive shell -- which this repo tried and reverted -- makes the
+# socket location depend on whether that shell happened to have
+# XDG_RUNTIME_DIR: a desktop session has one, ssh without pam_systemd does not.
+# Sessions started under one then become invisible to an attach from the other.
+# Making the image resemble a booted machine keeps the fix where the difference
+# actually is.
+RUN install -d -m 0700 -o tester -g tester "/run/tmux/$(id -u tester)"
+
 USER tester
 WORKDIR /home/tester

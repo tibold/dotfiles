@@ -8,6 +8,7 @@ const ALL = [
   { id: "opensuse-leap", family: "suse" }
   { id: "fedora", family: "fedora" }
   { id: "ubuntu", family: "debian" }
+  { id: "macos", family: "macos" }
 ]
 
 @test
@@ -74,9 +75,11 @@ export def "a protected package is never removed" [] {
 export def "removal never widens beyond what was asked" [] {
   # --clean-deps, --autoremove and friends pull in packages nobody listed.
   # That is the opposite of what this step is for.
-  for family in ["suse" "fedora" "debian"] {
+  # --zap is Homebrew's version of the same mistake: it goes looking for files
+  # outside the prefix.
+  for family in ["suse" "fedora" "debian" "macos"] {
     let command = (cleanup remove-command $family ["powerline"] | str join " ")
-    assert not ($command =~ 'clean-deps|autoremove|--purge') $"($family) removal widens the transaction: ($command)"
+    assert not ($command =~ 'clean-deps|autoremove|--purge|--zap') $"($family) removal widens the transaction: ($command)"
   }
 }
 
@@ -96,4 +99,22 @@ export def "removal is non-interactive" [] {
 export def "an unknown family cannot remove anything" [] {
   assert error {|| cleanup remove-command "plan9" ["x"] }
   assert equal (cleanup installed? "plan9" "anything") false
+}
+
+@test
+export def "Homebrew is not asked to uninstall as root" [] {
+  # Same reason as the install command: brew refuses to run as root, so a sudo
+  # here would turn a no-op step into a hard failure.
+  let command = (cleanup remove-command "macos" ["powerline"] | str join " ")
+  assert not ($command | str contains "sudo")
+  assert str contains $command "brew uninstall"
+}
+
+@test
+export def "macOS has nothing this repo wants to uninstall" [] {
+  # Not an accident worth preserving in silence: the Linux overlays remove
+  # powerline and starship because this repo installed them there. It has never
+  # installed anything on a Mac, so there is nothing here it has any business
+  # removing -- and "looks unused" is not a reason on any platform.
+  assert equal (packages resolve { id: "macos", family: "macos" }).removed []
 }

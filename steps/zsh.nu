@@ -25,6 +25,37 @@ const OMZ_INSTALLER = "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/
 # shell from the passwd entry rather than from $SHELL. On a machine set up by
 # hand years ago this has long since been done and is invisible; on a fresh one
 # it is the difference between the environment working and not.
+#
+# The two systems answer the same question differently. passwd is a file to be
+# read on Linux, and a database behind Directory Services on macOS, where
+# /etc/passwd still exists but does not describe a real user's account. The
+# parsing of each is separated out so both can be tested on either.
+
+# The shell field of a getent passwd line: seven colon-separated fields, the
+# shell last.
+export def parse-passwd-shell [text: string]: nothing -> string {
+  $text | str trim | split row ":" | last
+}
+
+# The shell from `dscl . -read /Users/NAME UserShell`, which answers
+# "UserShell: /bin/zsh" -- a key, a colon, the value.
+export def parse-dscl-shell [text: string]: nothing -> string {
+  $text | str trim | split row ":" | last | str trim
+}
+
+# This user's login shell as the system records it, or "" if it cannot be read.
+export def login-shell [user: string]: nothing -> string {
+  if $nu.os-info.name == "macos" {
+    let result = (do { ^dscl . -read $"/Users/($user)" UserShell } | complete)
+    if $result.exit_code != 0 { return "" }
+    parse-dscl-shell $result.stdout
+  } else {
+    let result = (do { ^getent passwd $user } | complete)
+    if $result.exit_code != 0 { return "" }
+    parse-passwd-shell $result.stdout
+  }
+}
+
 export def set-login-shell [--dry-run]: nothing -> nothing {
   let zsh = (which zsh | get --optional path.0)
   if $zsh == null {
@@ -32,15 +63,16 @@ export def set-login-shell [--dry-run]: nothing -> nothing {
     return
   }
 
-  let user = (^id --user --name | str trim)
-  let current = (do { ^getent passwd $user } | complete)
+  # -un rather than --user --name: the long options are GNU coreutils' and BSD
+  # id on macOS does not have them, while the short ones mean the same thing on
+  # both.
+  let user = (^id -un | str trim)
+  let shell = (login-shell $user)
 
-  if $current.exit_code != 0 {
-    log warn $"could not look up ($user) in passwd -- not changing the login shell"
+  if ($shell | is-empty) {
+    log warn $"could not look up ($user)'s login shell -- not changing it"
     return
   }
-
-  let shell = ($current.stdout | str trim | split row ":" | last)
 
   # Compared as resolved paths, not as strings. /bin is a symlink to /usr/bin
   # on any usr-merged distribution, so passwd saying /bin/zsh and `which`
@@ -54,6 +86,11 @@ export def set-login-shell [--dry-run]: nothing -> nothing {
   # chsh only accepts a shell listed in /etc/shells. The zsh package adds
   # itself there, so this holds after the packages step -- but say so plainly
   # rather than letting chsh fail with its own terse message.
+  #
+  # On macOS this is also the guard that stops a Homebrew zsh from being made
+  # the login shell: brew does not edit /etc/shells, and the system zsh that is
+  # listed there is already the default, so the normal outcome on a Mac is the
+  # skip above rather than anything happening here at all.
   let shells = (if ("/etc/shells" | path exists) {
     open --raw /etc/shells
     | lines
@@ -68,7 +105,9 @@ export def set-login-shell [--dry-run]: nothing -> nothing {
   }
 
   log info $"login shell is ($shell)"
-  log shell ["sudo" "chsh" "--shell" $zsh $user] --dry-run=$dry_run
+  # -s rather than --shell: util-linux's chsh accepts both, BSD's accepts only
+  # the short one.
+  log shell ["sudo" "chsh" "-s" $zsh $user] --dry-run=$dry_run
 }
 
 export def install [--home: path, --dry-run]: nothing -> nothing {

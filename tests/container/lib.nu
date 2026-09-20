@@ -29,6 +29,19 @@ export def containerfile [distro: string, here: path]: nothing -> path {
 export def stage [repo: path]: nothing -> path {
   let dest = (mktemp --directory --tmpdir "dotfiles-staging-XXXXXX")
 
+  # mktemp makes a directory nobody else can enter, which is right for a
+  # temporary directory and wrong for one about to be mounted into a container.
+  # The container runs as an unprivileged user that is not this one, and a 0700
+  # directory owned by somebody else is unreadable to it -- the install then
+  # fails on its first command with
+  #
+  #   cp: cannot access '/src': Permission denied
+  #
+  # which names neither the mount nor the permission that caused it. It costs
+  # nothing to be readable: this holds a copy of a public repository for the
+  # lifetime of one test run.
+  ^chmod 755 $dest
+
   let excludes = ["./node_modules"]
     | each {|e| ["--exclude" $e] }
     | flatten

@@ -1,42 +1,91 @@
 #!/bin/sh
 # Numbers for the tmux status line.
 #
-# Run once every status-interval, so it is one short-lived process reading
-# /proc rather than a daemon. Everything comes from a single awk pass over
-# /proc/meminfo -- three separate greps would be three more forks, five seconds
-# apart, forever.
+# Run once every status-interval, so it is one short-lived process reading the
+# kernel's own counters rather than a daemon. Each answer is a single pass --
+# three separate greps would be three more forks, five seconds apart, forever.
 #
 #   tmux-status cpu     load average over the last minute, and core count
 #   tmux-status mem     memory in use, as a percentage
 #   tmux-status swap    swap in use, as a percentage, or "-" when there is none
 #
-# Prints nothing rather than an error if /proc is not there, so a status line
-# on a system without it is merely missing a segment.
+# Two implementations, because the two systems this runs on do not keep these
+# numbers anywhere alike: Linux has /proc, macOS has sysctl and vm_stat. The
+# split is on what is actually readable rather than on `uname`, so a system
+# with neither -- which is the case this was originally careful about -- still
+# prints nothing rather than an error, and the status line is merely missing a
+# segment.
 
 set -eu
 
+if [ -r /proc/meminfo ]; then
+  kind=proc
+elif [ "$(uname -s)" = "Darwin" ]; then
+  kind=darwin
+else
+  exit 0
+fi
+
 case "${1:-}" in
   cpu)
-    [ -r /proc/loadavg ] || exit 0
-    load=$(cut -d' ' -f1 /proc/loadavg)
     # Load means little without knowing what it is being divided by: 4.0 is
     # saturated on 4 cores and idle-ish on 32.
-    cores=$(nproc 2>/dev/null || echo '?')
+    case "$kind" in
+      proc)
+        [ -r /proc/loadavg ] || exit 0
+        load=$(cut -d' ' -f1 /proc/loadavg)
+        cores=$(nproc 2>/dev/null || echo '?')
+        ;;
+      darwin)
+        # vm.loadavg is printed as "{ 1.85 2.01 2.09 }", so the one-minute
+        # figure is the second field.
+        load=$(sysctl -n vm.loadavg | awk '{print $2}')
+        cores=$(sysctl -n hw.ncpu 2>/dev/null || echo '?')
+        ;;
+    esac
     printf '%s/%s' "$load" "$cores"
     ;;
 
   mem)
-    [ -r /proc/meminfo ] || exit 0
-    # MemAvailable, not MemFree: free memory excludes cache and reclaimable
-    # slab, so it reads as though a healthy machine were nearly full.
-    awk '/^MemTotal:/ {t=$2} /^MemAvailable:/ {a=$2}
-         END {if (t > 0) printf "%d%%", (t - a) * 100 / t}' /proc/meminfo
+    case "$kind" in
+      proc)
+        # MemAvailable, not MemFree: free memory excludes cache and reclaimable
+        # slab, so it reads as though a healthy machine were nearly full.
+        awk '/^MemTotal:/ {t=$2} /^MemAvailable:/ {a=$2}
+             END {if (t > 0) printf "%d%%", (t - a) * 100 / t}' /proc/meminfo
+        ;;
+      darwin)
+        # macOS has no MemAvailable. The closest honest equivalent is what
+        # cannot be reclaimed without swapping: active plus wired plus whatever
+        # the compressor is holding. Free, inactive, speculative and purgeable
+        # pages are all available to something that asks, and counting them as
+        # used is what makes every Mac look permanently out of memory.
+        page=$(sysctl -n hw.pagesize)
+        total=$(sysctl -n hw.memsize)
+        vm_stat | awk -v page="$page" -v total="$total" '
+          /^Pages active:/                 {a = $NF + 0}
+          /^Pages wired down:/             {w = $NF + 0}
+          /^Pages occupied by compressor:/ {c = $NF + 0}
+          END {if (total > 0) printf "%d%%", (a + w + c) * page * 100 / total}'
+        ;;
+    esac
     ;;
 
   swap)
-    [ -r /proc/meminfo ] || exit 0
-    awk '/^SwapTotal:/ {t=$2} /^SwapFree:/ {f=$2}
-         END {if (t > 0) printf "%d%%", (t - f) * 100 / t; else printf "-"}' /proc/meminfo
+    case "$kind" in
+      proc)
+        awk '/^SwapTotal:/ {t=$2} /^SwapFree:/ {f=$2}
+             END {if (t > 0) printf "%d%%", (t - f) * 100 / t; else printf "-"}' /proc/meminfo
+        ;;
+      darwin)
+        # "total = 2048.00M  used = 512.25M  free = 1535.75M" -- both figures
+        # carry the same unit, so the ratio needs no conversion. A Mac that has
+        # never swapped reports a total of 0.00M, which is the "-" case.
+        sysctl -n vm.swapusage | awk '
+          {t = $3 + 0; u = $6 + 0}
+          END {if (t > 0) printf "%d%%", u * 100 / t; else printf "-"}'
+        ;;
+    esac
     ;;
 
   *)

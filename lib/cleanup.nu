@@ -26,6 +26,11 @@ export def installed? [family: string, package: string]: nothing -> bool {
       let result = (do { ^dpkg-query --show --showformat '${Status}' $package } | complete)
       $result.exit_code == 0 and ($result.stdout | str contains "install ok installed")
     }
+    # Formulae only. Nothing is ever removed as a cask -- packages/macos.nu
+    # installs a font and its REMOVED list is empty -- and letting `brew list`
+    # answer for both would make a formula and a cask sharing a token
+    # indistinguishable here.
+    "macos" => ((do { ^brew list --formula --versions $package } | complete).exit_code == 0)
     _ => false
   }
 }
@@ -54,6 +59,14 @@ export def reverse-deps [family: string, package: string]: nothing -> list<strin
       | each {|l| $l | str trim | str replace --regex '^\|' '' | str trim }
       | where {|l| ($l | is-not-empty) and (not ($l | str starts-with "Reverse Depends")) }
       | uniq
+    }
+    # --installed is what makes this the same question the others answer:
+    # `brew uses` without it lists every formula in the tap that could depend on
+    # this one, which is a much longer list and says nothing about this machine.
+    "macos" => {
+      let result = (do { ^brew uses --installed $package } | complete)
+      if $result.exit_code != 0 { return [] }
+      $result.stdout | lines | each {|l| $l | str trim } | where {|l| $l | is-not-empty } | uniq
     }
     _ => []
   }
@@ -123,6 +136,10 @@ export def remove-command [family: string, packages: list<string>]: nothing -> l
     "suse" => (["sudo" "zypper" "--non-interactive" "remove"] ++ $packages)
     "fedora" => (["sudo" "dnf" "remove" "-y"] ++ $packages)
     "debian" => (["sudo" "apt-get" "remove" "-y"] ++ $packages)
+    # No sudo, for the same reason as the install command. No --zap either:
+    # that is the cask equivalent of --purge and goes hunting for files outside
+    # the prefix.
+    "macos" => (["brew" "uninstall"] ++ $packages)
     _ => { error make { msg: $"no remove command for family '($family)'" } }
   }
 }
