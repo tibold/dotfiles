@@ -9,6 +9,11 @@
 #   list    expands to several packages
 #   null    not available; lib/fallback.nu fetches it from upstream instead
 export const OVERRIDES = {
+  # -- database clients (packages/common.nu DATABASES) --
+  # `postgresql` is the client; the server is postgresql-server.
+  postgresql-client: "postgresql"
+  sqlite: "sqlite3"
+
 
   # Not packaged by any distribution. Comes from the upstream release instead,
   # which is a self-contained build needing no dotnet -- see lib/fallback.nu.

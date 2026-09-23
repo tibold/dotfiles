@@ -3,7 +3,7 @@ use ../../lib/fallback.nu
 use ../../packages/common.nu
 # By name, not `use ... as steps`: the module name `packages` is already taken
 # by lib/packages.nu above, and steps/packages.nu would shadow it.
-use ../../steps/packages.nu [winget-plan font-present fnm-setup]
+use ../../steps/packages.nu [winget-plan font-present fnm-setup winget-command]
 use std/testing *
 use std/assert
 
@@ -417,4 +417,56 @@ export def "reinstalling a kept archive does not leave the old files behind" [] 
   assert equal (open --raw ($share | path join "git-credential-manager")) "new"
 
   rm --recursive --force $base
+}
+
+@test
+export def "every platform accounts for both database tools" [] {
+  # The same rule as the base list, for the opt-in group: nothing silently
+  # missing on one platform, and nothing that needs an upstream download.
+  for d in $ALL {
+    let r = (packages resolve $d --group databases)
+    assert equal $r.fallback [] $"($d.id) has no source for: ($r.fallback | str join ', ')"
+    let accounted = (($r.install | length) + ($r.provided | length) + ($r.omitted | length))
+    assert ($accounted >= ($common.DATABASES | length)) $"($d.id) resolves fewer database tools than it is asked for"
+  }
+}
+
+@test
+export def "database tools stay out of a plain install" [] {
+  # Most machines never talk to a database; only --with databases adds them.
+  for d in $ALL {
+    let base = (packages resolve $d).install
+    for id in (packages resolve $d --group databases).install {
+      assert ($id not-in $base) $"($id) is installed on ($d.id) without --with databases"
+    }
+  }
+}
+
+@test
+export def "a database group adds none of the base extras" [] {
+  let r = (packages resolve $WINDOWS --group databases)
+  assert not ("Microsoft.PowerShell" in $r.install) "the Windows EXTRA list leaked into the database group"
+  assert equal $r.pipx []
+  assert equal $r.npm []
+  assert equal $r.fonts []
+}
+
+@test
+export def "macOS takes psql from libpq and sqlite from the system" [] {
+  let r = (packages resolve $MACOS --group databases)
+  assert equal $r.install ["libpq"]
+  assert ("sqlite" in ($r.provided | get tool))
+}
+
+@test
+export def "the Windows PostgreSQL install leaves out the server" [] {
+  # The EDB installer is a full server by default: a Windows service, pgAdmin
+  # and StackBuilder, for a machine that only needs psql.
+  let r = (packages resolve $WINDOWS --group databases)
+  let command = (winget-command "PostgreSQL.PostgreSQL.18" $r.winget_args | str join " ")
+  assert str contains $command "--override"
+  assert str contains $command "--mode unattended"
+  assert str contains $command "--disable-components server,pgAdmin,stackbuilder"
+  # And an id with no extra arguments is the plain command.
+  assert not ((winget-command "SQLite.SQLite" $r.winget_args | str join " ") | str contains "--override")
 }

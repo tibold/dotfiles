@@ -23,6 +23,13 @@ if [[ "$OSTYPE" == darwin* ]]; then
     fi
   done
   unset _brew_prefix
+
+  # psql, from `nu install.nu --with databases`. Homebrew's libpq is keg-only
+  # -- it would clash with the full postgresql formula -- so nothing links it
+  # onto PATH. Most machines never install it, hence the check.
+  if [[ -n "$HOMEBREW_PREFIX" && -d "$HOMEBREW_PREFIX/opt/libpq/bin" ]]; then
+    export PATH="$HOMEBREW_PREFIX/opt/libpq/bin:$PATH"
+  fi
 fi
 
 # Path to your Oh My Zsh installation.

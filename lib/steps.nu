@@ -3,15 +3,17 @@
 # Kept out of install.nu so the rules can be tested; install.nu only dispatches.
 
 # Order matters. Packages first because later steps need what they install;
-# claude before neovim so the plugin in the neovim config can be registered in
-# the same run; macos last. Every name is here on every platform so `--only X`
-# answers "that step does not apply here" rather than "unknown step".
-export const ORDER = ["packages" "plugins" "cleanup" "links" "appdirs" "zsh" "powershell" "claude" "neovim" "hooks" "macos"]
+# databases right after them, being more of the same; claude before neovim so
+# the plugin in the neovim config can be registered in the same run; macos
+# last. Every name is here on every platform so `--only X` answers "that step
+# does not apply here" rather than "unknown step".
+export const ORDER = ["packages" "databases" "plugins" "cleanup" "links" "appdirs" "zsh" "powershell" "claude" "neovim" "hooks" "macos"]
 
 # Run only when named, with --with or --only. Claude Code is a personal tool
 # that authenticates interactively, and not every machine this repo lands on
-# should have it.
-export const OPT_IN = ["claude"]
+# should have it. The database clients (DATABASES in packages/common.nu) are
+# for the neovim database plugin, which most machines never use.
+export const OPT_IN = ["claude" "databases"]
 
 def names [csv: string]: nothing -> list<string> {
   let wanted = ($csv | split row "," | each {|s| $s | str trim } | where {|s| $s | is-not-empty })

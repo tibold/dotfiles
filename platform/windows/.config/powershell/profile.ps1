@@ -16,6 +16,15 @@ $spell = { param($p) $p.Replace('/', '\').TrimEnd('\') }
 $onPath = $env:PATH -split ';' | Where-Object { (& $spell $_) -eq (& $spell $localBin) }
 if ((Test-Path $localBin) -and -not $onPath) { $env:PATH = "$localBin;$env:PATH" }
 
+# psql, from `nu install.nu --with databases`. The EDB installer puts it in
+# Program Files\PostgreSQL\<major>\bin and never on PATH; the newest major
+# wins. Most machines never install it, so nothing happens when it is absent.
+$pgBin = Get-ChildItem (Join-Path $env:ProgramFiles 'PostgreSQL\*\bin') -Directory -ErrorAction SilentlyContinue |
+    Sort-Object { [int]($_.Parent.Name -replace '\D', '') } -Descending | Select-Object -First 1
+if ($pgBin -and -not ($env:PATH -split ';' | Where-Object { (& $spell $_) -eq (& $spell $pgBin.FullName) })) {
+    $env:PATH = "$($pgBin.FullName);$env:PATH"
+}
+
 Set-Alias -Name k -Value kubectl
 Set-Alias -Name tf -Value terraform
 Set-Alias -Name vim -Value nvim

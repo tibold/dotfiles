@@ -16,7 +16,7 @@ use ../packages/windows.nu
 # not define. An overlay names only the fields it has something to say about --
 # casks and provided are Homebrew and macOS concepts, fonts is winget's, and an
 # overlay that has none of its own should not have to restate that.
-const EMPTY = { overrides: {}, casks: {}, fonts: {}, extra: [], provided: {}, omitted: {}, removed: [] }
+const EMPTY = { overrides: {}, casks: {}, fonts: {}, extra: [], provided: {}, omitted: {}, removed: [], winget_args: {} }
 
 # The overlay for a distro is its family's, with its own laid on top.
 #
@@ -40,6 +40,7 @@ export def overlay-for [distro: record]: nothing -> record {
     "windows" => ($EMPTY | merge {
       overrides: $windows.OVERRIDES, fonts: $windows.FONTS, extra: $windows.EXTRA
       provided: $windows.PROVIDED, omitted: $windows.OMITTED, removed: $windows.REMOVED
+      winget_args: $windows.WINGET_ARGS
     })
     _ => $EMPTY
   }
@@ -57,6 +58,7 @@ export def overlay-for [distro: record]: nothing -> record {
     provided: ($family.provided | merge $specific.provided)
     omitted: ($family.omitted | merge $specific.omitted)
     removed: ($family.removed ++ $specific.removed | uniq)
+    winget_args: ($family.winget_args | merge $specific.winget_args)
   }
 }
 
@@ -88,10 +90,20 @@ def expand [value: any]: nothing -> list<string> {
 # curl, tar, make and the compiler are all present there without Homebrew
 # having anything to do with it. Calling that "omitted" would tell a reader the
 # environment lacks a tool that is on their PATH.
-export def resolve [distro: record]: nothing -> record {
+#
+# `--group databases` resolves the opt-in DATABASES list instead, through the
+# same overlays and the same accounting, but without the base list's
+# companions: no EXTRA, no pipx or npm, nothing to remove.
+export def resolve [distro: record, --group: string = "base"]: nothing -> record {
   let overlay = (overlay-for $distro)
+  let base = ($group == "base")
+  let names = (match $group {
+    "base" => $common.PACKAGES
+    "databases" => $common.DATABASES
+    _ => { error make { msg: $"unknown package group '($group)' -- base or databases" } }
+  })
 
-  let mapped = $common.PACKAGES | each {|logical|
+  let mapped = $names | each {|logical|
     # Fonts and casks first: a logical name mapped to either is answered by
     # that, and never also looked up as a formula or winget id.
     if $logical in $overlay.fonts {
@@ -113,7 +125,7 @@ export def resolve [distro: record]: nothing -> record {
   let omitted_names = ($overlay.omitted | columns)
 
   {
-    install: ($mapped | get packages | flatten | append $overlay.extra | uniq)
+    install: ($mapped | get packages | flatten | append (if $base { $overlay.extra } else { [] }) | uniq)
     casks: ($mapped | get casks | flatten | uniq)
     fonts: ($mapped | get fonts | flatten | uniq)
     fallback: ($unavailable | where {|t| $t not-in $omitted_names and $t not-in $provided_names })
@@ -122,8 +134,9 @@ export def resolve [distro: record]: nothing -> record {
     # tmuxp, the one pipx application, drives tmux; Windows has no tmux to
     # drive (see packages/windows.nu's OMITTED for pipx), so there is nothing
     # for pipx to install there.
-    pipx: (if $distro.family == "windows" { [] } else { $common.PIPX })
-    npm: $common.NPM
-    removed: $overlay.removed
+    pipx: (if $base and $distro.family != "windows" { $common.PIPX } else { [] })
+    npm: (if $base { $common.NPM } else { [] })
+    removed: (if $base { $overlay.removed } else { [] })
+    winget_args: $overlay.winget_args
   }
 }

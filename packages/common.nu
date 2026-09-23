@@ -87,6 +87,17 @@ export const PACKAGES = [
   mkisofs
 ]
 
+# Database clients, installed only with `nu install.nu --with databases`.
+#
+# Kept out of PACKAGES because most machines never talk to a database: these
+# are here for the neovim config's database plugin (dadbod), which shells out
+# to the client for each engine. Each overlay maps them like any other tool,
+# and tests/unit/packages.nu holds every platform to accounting for both.
+export const DATABASES = [
+  postgresql-client   # psql
+  sqlite              # sqlite3
+]
+
 # Installed through pipx rather than the distro, because the distro versions
 # lag and these are pure-python leaf tools with no system integration.
 export const PIPX = [

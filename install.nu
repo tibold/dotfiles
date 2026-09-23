@@ -141,6 +141,7 @@ def --env main [
       "macos" => (macos install --home $target --dry-run=$dry_run)
       "powershell" => (powershell install --home $target --dry-run=$dry_run)
       "claude" => (claude install $system.family --dry-run=$dry_run)
+      "databases" => (packages install $system --bin-dir $bin_dir --group databases --dry-run=$dry_run)
       # An unknown step name should never reach here (steps requested validates
       # against lib/steps.nu's ORDER and OPT_IN), but fail loudly if it does.
       _ => { error make { msg: $"install.nu has no dispatch arm for step '($step)' -- add one" } }

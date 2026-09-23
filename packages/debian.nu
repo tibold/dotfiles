@@ -4,6 +4,9 @@
 # upstream releases more than the others: Debian's archive is conservative and
 # several of these tools are either absent or too old to be worth having.
 export const OVERRIDES = {
+  # -- database clients (packages/common.nu DATABASES) --
+  sqlite: "sqlite3"
+
 
   # Not packaged by any distribution. Comes from the upstream release instead,
   # which is a self-contained build needing no dotnet -- see lib/fallback.nu.

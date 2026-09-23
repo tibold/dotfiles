@@ -19,6 +19,13 @@
 #   null    not available as a formula; must be accounted for in CASKS,
 #           PROVIDED or OMITTED
 export const OVERRIDES = {
+  # -- database clients (packages/common.nu DATABASES) --
+  # libpq is the client library and tools without the server. It is keg-only
+  # (it would conflict with the postgresql formula), so home/.zshrc puts its
+  # bin directory on PATH when it is installed.
+  postgresql-client: "libpq"
+  sqlite: null
+
   nodejs: "node"
 
   # Same as Fedora and Debian: cdrtools is not packaged, xorriso does the job
@@ -81,6 +88,7 @@ export const EXTRA = []
 # copy that either shadows the system one or, for the keg-only formulae, is not
 # even on PATH -- more to maintain, for a tool we already have.
 export const PROVIDED = {
+  sqlite: "macOS ships sqlite3 at /usr/bin/sqlite3"
   zsh: "macOS ships zsh and already uses it as the login shell; Homebrew's would additionally have to be added to /etc/shells before it could be one"
   curl: "the system curl is current, and Homebrew's is keg-only -- installing it would not even put it on PATH"
   tar: "bsdtar is /usr/bin/tar; Homebrew's GNU tar installs as gtar, and nothing here passes a GNU-only flag"

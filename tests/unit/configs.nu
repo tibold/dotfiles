@@ -458,3 +458,17 @@ export def "the pwsh profile loads machine-local settings last" [] {
   let code = ($rc | lines | where {|l| ($l | str trim | is-not-empty) and (not ($l | str trim | str starts-with "#")) })
   assert str contains ($code | last) "local.ps1"
 }
+
+@test
+export def "psql reaches PATH only where it is installed" [] {
+  # Both are keg- or installer-local, so a shell config puts them on PATH --
+  # guarded, because most machines never install them.
+  let zshrc = (open --raw ($REPO | path join "home" ".zshrc"))
+  let libpq = ($zshrc | lines | where {|l| $l =~ 'opt/libpq/bin' })
+  assert ($libpq | is-not-empty) ".zshrc does not add Homebrew's libpq to PATH"
+  assert ($libpq | any {|l| $l =~ '-d ' }) "the libpq PATH entry is not guarded by a directory check"
+
+  let profile = (open --raw ($REPO | path join "platform" "windows" ".config" "powershell" "profile.ps1"))
+  assert str contains $profile "PostgreSQL"
+  assert ($profile =~ 'PostgreSQL[^\n]*SilentlyContinue') "the PostgreSQL PATH lookup is not guarded"
+}

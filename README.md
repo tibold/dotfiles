@@ -82,6 +82,7 @@ nu install.nu --copy                # copy files instead of linking them
 nu install.nu --only macos          # just the macOS system defaults
 nu install.nu --with claude         # everything, plus the opt-in Claude Code step
 nu install.nu --only claude         # just Claude Code
+nu install.nu --with databases      # everything, plus psql and sqlite3
 nu install.nu --only powershell     # just the pwsh profile stub (Windows only)
 ```
 
@@ -158,6 +159,30 @@ export const CASKS = {
 
 A logical name in `CASKS` is answered by that and never looked up as a formula,
 so it needs no override and no null.
+
+## Database clients
+
+`psql` and `sqlite3` are for the neovim config's database plugin, and most
+machines never talk to a database, so they are opt-in:
+
+```sh
+nu install.nu --with databases      # everything, plus the clients
+nu install.nu --only databases      # just the clients
+```
+
+They are `DATABASES` in `packages/common.nu`, mapped by each overlay like any
+other tool and held to the same rule by the tests: every platform accounts for
+both, and neither is installed without the flag.
+
+Two platforms need more than a package name:
+
+- **macOS** takes psql from Homebrew's `libpq`, which is keg-only, so
+  `.zshrc` puts `$(brew --prefix)/opt/libpq/bin` on PATH when it exists.
+  sqlite3 is already in the base system.
+- **Windows** has no client-only PostgreSQL on winget, only the full EDB
+  installer. `WINGET_ARGS` in `packages/windows.nu` tells it to leave out the
+  server, pgAdmin and StackBuilder -- no Windows service is installed -- and
+  the pwsh profile puts the newest `Program Files\PostgreSQL\*\bin` on PATH.
 
 ## Nushell plugins
 

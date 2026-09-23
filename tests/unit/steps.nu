@@ -73,3 +73,14 @@ export def "Claude installer commands contain no embedded newlines" [] {
     }
   }
 }
+
+@test
+export def "database tools are opt-in and come right after the packages" [] {
+  assert not ("databases" in (steps requested --only "" --with ""))
+  let s = (steps requested --only "" --with "databases")
+  let i = ($s | enumerate | where item == "databases" | first | get index)
+  let p = ($s | enumerate | where item == "packages" | first | get index)
+  assert equal $i ($p + 1)
+  assert (steps applies "databases" "windows")
+  assert (steps applies "databases" "debian")
+}

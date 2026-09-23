@@ -29,14 +29,22 @@ export def fnm-setup [default_output: string]: nothing -> list<list<string>> {
   }
 }
 
+# The winget install command for one id, with any extra arguments its
+# overlay names (WINGET_ARGS). Pure, so the arguments can be tested.
+export def winget-command [id: string, extra: record]: nothing -> list<string> {
+  (distro winget-install-command $id) ++ ($extra | get --optional $id | default [])
+}
+
 export def install [
   distro: record
   --bin-dir: path
+  --group: string = "base"   # or "databases", the opt-in step's list
   --dry-run
 ]: nothing -> nothing {
-  let plan = (packages resolve $distro)
+  let plan = (packages resolve $distro --group $group)
+  let title = (if $group == "base" { "System packages" } else { "Database clients" })
 
-  log step $"System packages for ($distro.pretty) \(($plan.install | length) packages)"
+  log step $"($title) for ($distro.pretty) \(($plan.install | length) packages)"
 
   # winget has no batch install and no all-or-nothing transaction, so it gets
   # its own path entirely rather than sharing the apt/dnf/zypper/brew one
@@ -119,7 +127,7 @@ def install-windows [plan: record, --dry-run]: nothing -> nothing {
   for row in (winget-plan $plan.install $installed) {
     if $row.action == "skip" { log skipped $"($row.id) already installed"; continue }
     try {
-      log shell (distro winget-install-command $row.id) --dry-run=$dry_run
+      log shell (winget-command $row.id $plan.winget_args) --dry-run=$dry_run
     } catch {
       log warn $"($row.id) did not install -- carrying on; re-run to retry"
     }
@@ -141,6 +149,10 @@ def install-windows [plan: record, --dry-run]: nothing -> nothing {
 
   for present in $plan.provided { log skipped $"($present.tool): in the base system -- ($present.reason)" }
   for skipped in $plan.omitted { log skipped $"($skipped.tool): ($skipped.reason)" }
+
+  # Only the base list carries npm packages; the database group has no use
+  # for Node at all.
+  if ($plan.npm | is-empty) { return }
 
   if (which fnm | is-not-empty) or $dry_run {
     let current = (if (which fnm | is-empty) { "" } else { do { ^fnm default } | complete | get stdout })

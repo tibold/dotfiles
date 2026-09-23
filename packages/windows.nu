@@ -14,6 +14,13 @@
 #   string  the id
 #   null    not from winget; must be accounted for in FONTS, PROVIDED or OMITTED
 export const OVERRIDES = {
+  # -- database clients (packages/common.nu DATABASES) --
+  # There is no client-only PostgreSQL on winget: this is the full EDB
+  # installer, told by WINGET_ARGS below to leave out everything but the
+  # command-line tools. The pwsh profile puts its bin directory on PATH.
+  postgresql-client: "PostgreSQL.PostgreSQL.18"
+  sqlite: "SQLite.SQLite"
+
   tmux: "marlocarlo.psmux"
   htop: "marlocarlo.pstop"
   # The C compiler nvim-treesitter's parser builds find. Not gcc, but gcc is
@@ -70,6 +77,17 @@ export const EXTRA = [
   "marlocarlo.psnet"          # the rest of the psmux family
   "marlocarlo.tmuxpanel"      # tmuxpanel, tmuxplugins, tmuxthemes
 ]
+
+# Extra `winget install` arguments for the ids that need them.
+#
+# --override replaces the installer's whole command line, so it has to repeat
+# the unattended switches winget would otherwise have passed. Without
+# --disable-components the EDB installer sets up a PostgreSQL server as a
+# Windows service, plus pgAdmin and StackBuilder, on a machine that only wants
+# psql.
+export const WINGET_ARGS = {
+  "PostgreSQL.PostgreSQL.18": ["--override" "--mode unattended --unattendedmodeui none --disable-components server,pgAdmin,stackbuilder"]
+}
 
 export const PROVIDED = {
   curl: "curl.exe ships with Windows 10 1803 and later"
