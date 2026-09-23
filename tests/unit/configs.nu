@@ -308,7 +308,18 @@ export def "every credential helper the gitconfig names is a tool this repo inst
     # exist on Linux, so committing it breaks every other machine quietly.
     assert not ($helper | str starts-with "/") $"($helper) is an absolute path, which only exists on the machine it was written on -- name the command and let PATH find it"
 
-    assert ($helper in $common.PACKAGES) $"($helper) is configured as a credential helper but is not in packages/common.nu, so nothing installs it"
+    # git does not run a bare helper name as written: `helper = foo` runs
+    # `git credential-foo`, which is the executable git-credential-foo. So the
+    # name to configure is the executable's name with that prefix taken off --
+    # `manager` for git-credential-manager. Naming the executable itself asks
+    # git for git-credential-git-credential-manager, which fails with "not a
+    # git command" at the first push; this file did exactly that from its first
+    # commit, and it went unnoticed while Git for Windows' own system-level
+    # `helper = manager` was doing the work.
+    assert not ($helper | str starts-with "git-credential-") $"($helper) is the executable's name; git prepends credential- itself, so configure `helper = ($helper | str replace 'git-credential-' '')`"
+
+    let executable = $"git-credential-($helper)"
+    assert ($executable in $common.PACKAGES) $"helper = ($helper) runs ($executable), which is not in packages/common.nu, so nothing installs it"
   }
 }
 

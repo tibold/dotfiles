@@ -38,9 +38,21 @@
 # afterwards, and stays in the stash list if reapplying conflicts.
 [rebase]
 	autoStash = true
+
+# Drop remote-tracking branches whose branch is gone on the remote. PR branches
+# are deleted when they merge, and without this every one of them lingers as
+# origin/<name> in lazygit and in branch completion until pruned by hand.
+[fetch]
+	prune = true
+
+# Git Credential Manager. `manager`, not `git-credential-manager`: git turns a
+# bare helper name into `git credential-<name>`, so the executable's own name
+# would ask for git-credential-git-credential-manager and fail at the first
+# push. The empty helper first clears any helper inherited from the system
+# config, so this is the only one asked.
 [credential "https://dev.azure.com"]
-	helper = 
-	helper = git-credential-manager
+	helper =
+	helper = manager
 	credentialStore = plaintext
 	useHttpPath = true
 [credential "https://github.com"]
