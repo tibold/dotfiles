@@ -202,3 +202,51 @@ export def "macOS collapses to a single platform name" [] {
   # three times would back up its own link on the second pass.
   assert equal (distro config-names { id: "macos", family: "macos" }) ["macos"]
 }
+
+# --- Windows --------------------------------------------------------------
+
+@test
+export def "Windows describes itself without an os-release file" [] {
+  let d = (distro describe-windows "26200")
+  assert equal $d.id "windows"
+  assert equal $d.family "windows"
+  assert equal $d.manager "winget"
+  assert equal $d.pretty "Windows (build 26200)"
+  assert equal (distro describe-windows "").pretty "Windows"
+}
+
+@test
+export def "Windows is its own single platform name" [] {
+  assert equal (distro config-names { id: "windows", family: "windows" }) ["windows"]
+}
+
+@test
+export def "winget installs one exact id without prompting" [] {
+  let c = (distro winget-install-command "Git.Git")
+  assert equal ($c | first) "winget"
+  for flag in ["--exact" "--accept-package-agreements" "--accept-source-agreements" "--disable-interactivity"] {
+    assert ($flag in $c) $"missing ($flag)"
+  }
+  assert equal ($c | skip until {|x| $x == "--id" } | get 1) "Git.Git"
+  assert not ("sudo" in $c)
+}
+
+@test
+export def "winget is not handed a list" [] {
+  # One id per call is what lets one bad id fail alone.
+  assert error {|| distro install-command "windows" ["Git.Git"] }
+}
+
+@test
+export def "a global npm install on Windows goes through fnm" [] {
+  let c = (distro npm-global-command "windows" ["neovim"])
+  assert equal ($c | first 5) ["fnm" "exec" "--using" "default" "--"]
+  # npm is a .cmd shim on Windows; fnm exec cannot spawn it by the bare name.
+  assert equal ($c | get 5) "npm.cmd"
+  assert equal ($c | last) "neovim"
+}
+
+@test
+export def "winget needs no separate index refresh" [] {
+  assert equal (distro refresh-command "windows") []
+}

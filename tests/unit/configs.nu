@@ -5,7 +5,9 @@
 
 use ../../steps/zsh.nu
 use ../../lib/distro.nu
+use ../../lib/paths.nu
 use ../../packages/macos.nu
+use ../../packages/windows.nu
 use ../../packages/common.nu
 use std/testing *
 use std/assert
@@ -31,7 +33,7 @@ def active [file: path]: nothing -> string {
 
 # Every file that gets linked into $HOME.
 def home-files []: nothing -> list<path> {
-  let files = (glob ($REPO | path join "home" "**" "*") --no-dir)
+  let files = (glob ($REPO | path join "home" "**" "*" | paths for-glob) --no-dir)
   # Guards against the whole suite passing vacuously if this path is ever
   # wrong: an empty glob would make every loop below a no-op.
   assert ($files | is-not-empty) $"no files found under ($REPO)/home"
@@ -247,7 +249,7 @@ export def "every colour the status line uses is defined by a theme" [] {
 
   assert ($used | is-not-empty) "the status line references no theme colours at all"
 
-  let themes = (glob ($REPO | path join "home" ".config" "tmux" "themes" "*.conf"))
+  let themes = (glob ($REPO | path join "home" ".config" "tmux" "themes" "*.conf" | paths for-glob))
   assert ($themes | is-not-empty) "no themes found"
 
   for theme in $themes {
@@ -324,6 +326,26 @@ export def "every credential helper the gitconfig names is a tool this repo inst
 }
 
 @test
+export def "every credential store is one GCM knows" [] {
+  # GCM refuses an unknown store outright ("Unknown credential store") rather
+  # than falling back, so a misspelt one fails the first authentication. The
+  # Windows one is the easy mistake: `wincred` is git's old built-in helper,
+  # GCM's name for the same Credential Manager is `wincredman`.
+  let known = ["wincredman" "dpapi" "keychain" "secretservice" "gpg" "cache" "plaintext" "none"]
+  let files = ([($REPO | path join "home" ".gitconfig")]
+    ++ (glob ($REPO | path join "platform" "*" ".config" "git" "platform.conf" | paths for-glob)))
+  for file in $files {
+    let stores = (open --raw $file
+      | lines
+      | where {|l| $l =~ '^\s*credentialStore\s*=' }
+      | each {|l| $l | str replace --regex '^\s*credentialStore\s*=\s*' '' | str trim })
+    for store in $stores {
+      assert ($store in $known) $"($file | path relative-to $REPO) sets credentialStore = ($store), which GCM does not know -- one of: ($known | str join ', ')"
+    }
+  }
+}
+
+@test
 export def "the gitconfig includes the platform file" [] {
   # git has no condition for "which system is this", but it does ignore an
   # include whose file is absent -- so the file's existence is the condition,
@@ -343,7 +365,7 @@ export def "every platform directory is a name that can match a machine" [] {
   # A typo here fails silently and completely: platform/darwin/ or
   # platform/osx/ would simply never be linked, and the settings in it would
   # never apply, with nothing on screen to say so.
-  let dirs = (glob ($REPO | path join "platform" "*") --no-file
+  let dirs = (glob ($REPO | path join "platform" "*" | paths for-glob) --no-file
     | each {|d| $d | path basename })
 
   let matchable = ([
@@ -353,6 +375,7 @@ export def "every platform directory is a name that can match a machine" [] {
     { id: "ubuntu", family: "debian" }
     { id: "debian", family: "debian" }
     { id: "macos", family: "macos" }
+    { id: "windows", family: "windows" }
   ] | each {|s| distro config-names $s } | flatten | uniq)
 
   for dir in $dirs {
@@ -368,9 +391,9 @@ export def "the font Rio asks for is the font this repo installs" [] {
   # tmux status separators are drawn from.
   #
   # Compared by family prefix, because a cask token and a font family are not
-  # spelled alike -- font-meslo-lg-nerd-font installs "MesloLGS Nerd Font
-  # Mono" and its siblings. Changing the cask without changing the config, or
-  # the other way round, is what this catches.
+  # spelled alike -- font-0xproto-nerd-font installs "0xProto Nerd Font
+  # Mono" and its siblings. Changing the cask or the Windows FONTS entry
+  # without changing the config, or the other way round, is what this catches.
   let rio = ($REPO | path join "home" ".config" "rio" "config.toml")
   if not ($rio | path exists) { return }
 
@@ -386,5 +409,52 @@ export def "the font Rio asks for is the font this repo installs" [] {
     | str replace --regex '-nerd-font$' ''
     | str replace --all '-' '')
 
-  assert (($family | str downcase | str replace --all ' ' '') | str starts-with $stem) $"Rio asks for '($family)' but packages/macos.nu installs ($cask) -- one of the two moved without the other"
+  let flat = ($family | str downcase | str replace --all ' ' '')
+  assert ($flat | str starts-with $stem) $"Rio asks for '($family)' but packages/macos.nu installs ($cask) -- one of the two moved without the other"
+
+  let windows_font = ($windows.FONTS | get nerd-fonts)
+  assert ($flat | str starts-with ($windows_font | str downcase)) $"Rio asks for '($family)' but packages/windows.nu installs ($windows_font) -- one of the two moved without the other"
+}
+
+@test
+export def "psmux sources theme files that exist" [] {
+  let conf = (open --raw ($REPO | path join "platform" "windows" ".psmux.conf"))
+  let sourced = ($conf | lines | where {|l| $l | str trim | str starts-with "source-file" })
+  assert ($sourced | is-not-empty) "psmux sources no theme"
+  for line in $sourced {
+    assert not ($line | str contains "-q") "psmux mis-parses source-file -q; use a plain path"
+    let rel = ($line | str trim | split row " " | last | str replace "~/" "")
+    assert ($REPO | path join "home" $rel | path exists) $"psmux sources ($rel), which is not in home/"
+  }
+}
+
+@test
+export def "the prompt uses only colours from the tmux theme" [] {
+  let theme = (open --raw ($REPO | path join "home" ".config" "tmux" "themes" "archpillar-cyberpunk.conf"))
+  let palette = ($theme | parse --regex '"(#[0-9A-Fa-f]{6})"' | get capture0 | str upcase | append ["#FF3B57" "#FFB400"])
+  let omp = (open --raw ($REPO | path join "platform" "windows" ".config" "oh-my-posh" "archpillar-cyberpunk.omp.toml"))
+  $omp | from toml | ignore  # parses
+  for colour in ($omp | parse --regex "'(#[0-9A-Fa-f]{6})'" | get capture0 | str upcase | uniq) {
+    assert ($colour in $palette) $"($colour) in the oh-my-posh theme is not an ArchPillar cyberpunk token"
+  }
+}
+
+@test
+export def "the prompt keeps its powerline separators" [] {
+  # The glyphs live in the Private Use Area, which editors and converters are
+  # free to drop without a word: the first TOML version of this theme lost
+  # every one of them, and the prompt rendered as flat blocks in any font.
+  let omp = (open ($REPO | path join "platform" "windows" ".config" "oh-my-posh" "archpillar-cyberpunk.omp.toml"))
+  let powerline = ($omp.blocks.segments | flatten | where {|s| ($s.style? | default "") == "powerline" })
+  assert ($powerline | is-not-empty) "no powerline segments found"
+  for s in $powerline {
+    assert (($s.powerline_symbol? | default "") | is-not-empty) $"the ($s.type) segment has lost its powerline symbol"
+  }
+}
+
+@test
+export def "the pwsh profile loads machine-local settings last" [] {
+  let rc = (open --raw ($REPO | path join "platform" "windows" ".config" "powershell" "profile.ps1"))
+  let code = ($rc | lines | where {|l| ($l | str trim | is-not-empty) and (not ($l | str trim | str starts-with "#")) })
+  assert str contains ($code | last) "local.ps1"
 }

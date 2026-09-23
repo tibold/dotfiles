@@ -13,6 +13,7 @@
 # machine where the checkout should not be load-bearing.
 
 use log.nu
+use paths.nu
 
 # readlink, as a question rather than an error.
 #
@@ -21,9 +22,49 @@ use log.nu
 # they cannot tell "no file here" apart from "a link here pointing at nothing"
 # -- and a dangling link left by an earlier run is exactly what we need to
 # replace.
-def link-target [p: path]: nothing -> any {
-  let result = (do { ^readlink $p } | complete)
-  if $result.exit_code == 0 { $result.stdout | str trim } else { null }
+#
+# Answered by nushell rather than by readlink, which is not on a Windows PATH.
+# `path type` does not follow the link, so it says "symlink" for a dangling one
+# too, and `ls --directory` reports the link itself rather than listing what a
+# link to a directory points at.
+export def link-target [p: path]: nothing -> any {
+  if ($p | path type) != "symlink" { return null }
+  ls --all --long --directory $p | first | get target
+}
+
+# Whether `p` is `root` or somewhere beneath it.
+#
+# A plain prefix test would count ~/dotfiles-old as inside ~/dotfiles, and
+# pruning trusts this answer before it deletes anything, so the separator is
+# part of the comparison. Windows paths are compared case-insensitively and
+# with either slash, because the same file is spelled all of those ways there.
+export def is-inside [p: path, root: path]: nothing -> bool {
+  let norm = {|x|
+    let s = ($x | path expand --no-symlink | str replace --all '\' '/' | str trim --right --char '/')
+    if $nu.os-info.name == "windows" { $s | str lowercase } else { $s }
+  }
+  let a = (do $norm $p)
+  let r = (do $norm $root)
+  $a == $r or ($a | str starts-with $"($r)/")
+}
+
+# Put a symlink to `source` at `target`, replacing any link already there.
+#
+# Windows has no ln. mklink creates the link without elevation when Developer
+# Mode is on, which bootstrap.ps1 checks for; without it this fails, and the
+# message says what to do rather than leaving mklink's own.
+export def make-link [source: path, target: path]: nothing -> nothing {
+  if $nu.os-info.name == "windows" {
+    if ($target | path type) == "symlink" { rm --force $target }
+    let r = (do { ^cmd /c mklink ($target | path expand --no-symlink) ($source | path expand --no-symlink) } | complete)
+    if $r.exit_code != 0 {
+      error make { msg: $"could not link ($target): ($r.stderr | str trim) -- turn on Developer Mode, or re-run with --copy" }
+    }
+  } else {
+    # -n so that a target which is a symlink to a directory is replaced rather
+    # than followed into; -f so an existing link is overwritten.
+    ^ln -sfn $source $target
+  }
 }
 
 def classify [source: path, target: path]: nothing -> string {
@@ -55,10 +96,16 @@ export def plan [
     error make { msg: $"($source_root) does not exist -- is --root the repo root?" }
   }
 
-  glob ($source_root | path join "**" "*") --no-dir
+  glob ($source_root | path join "**" "*" | paths for-glob) --no-dir
   | each {|source|
-      let relative = ($source | path relative-to $source_root)
-      let target = ($home | path join $relative)
+      # `target` is built from the OS-native separators `path relative-to`
+      # returns, so `path join` below produces a real Windows path rather than
+      # the backslash/forward-slash mix a normalised string would give it.
+      # `relative` is the row's identity and gets printed, so it is normalised
+      # separately: backslashes there would make both platform-specific.
+      let native_relative = ($source | path relative-to $source_root)
+      let relative = ($native_relative | str replace --all '\' '/')
+      let target = ($home | path join $native_relative)
       {
         relative: $relative
         source: $source
@@ -141,9 +188,7 @@ def place [row: record, --copy]: nothing -> nothing {
   if $copy {
     cp --force $row.source $row.target
   } else {
-    # -n so that a target which is a symlink to a directory is replaced rather
-    # than followed into; -f so an existing link is overwritten.
-    ^ln -sfn $row.source $row.target
+    make-link $row.source $row.target
   }
   log ok $row.relative
 }
@@ -181,7 +226,7 @@ export def stale [
 ]: nothing -> table {
   let source_root = ($root | path join $from)
 
-  let search = (glob ($source_root | path join "**" "*") --no-file
+  let search = (glob ($source_root | path join "**" "*" | paths for-glob) --no-file
     | append $source_root
     | each {|dir|
         let relative = ($dir | path relative-to $source_root)
@@ -197,8 +242,15 @@ export def stale [
       # it and every directory looks empty.
       ls --all --long $dir
       | where type == symlink
-      | where {|entry| ($entry.target | path expand --no-symlink | str starts-with $root) }
-      | where {|entry| not ($entry.target | path exists) }
+      # A relative target is relative to the link's own directory, not to
+      # wherever install.nu happens to run from. Taken as it stands, a working
+      # `mylink -> target-file` the user made would be looked up in the current
+      # directory -- usually this repo -- and read as a dead link of ours.
+      # `path join` leaves an absolute target as it is, which is every link
+      # this repo makes.
+      | each {|entry| $entry | insert resolved ($entry.name | path dirname | path join $entry.target) }
+      | where {|entry| is-inside $entry.resolved $root }
+      | where {|entry| not ($entry.resolved | path exists) }
       | where {|entry| $entry.name not-in $managed }
       | each {|entry| { target: $entry.name, points_at: $entry.target } }
     }

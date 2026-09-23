@@ -6,6 +6,7 @@
 #   nu install.nu --dry-run           show what would happen, change nothing
 #   nu install.nu --only links        just one part
 #   nu install.nu --only packages,links
+#   nu install.nu --with claude       everything, plus an opt-in step
 #   nu install.nu --copy              copy files instead of symlinking them
 #
 # Run bootstrap.sh first on a machine that does not have nushell yet; it
@@ -14,6 +15,8 @@
 use lib/log.nu
 use lib/distro.nu
 use lib/links.nu
+use lib/steps.nu
+use lib/winpath.nu
 use steps/packages.nu
 use steps/plugins.nu
 use steps/cleanup.nu
@@ -22,32 +25,8 @@ use steps/neovim.nu
 use steps/githooks.nu
 use steps/macos.nu
 use steps/appdirs.nu
-
-# Order matters. Packages come first because later steps need the tools they
-# install -- git for the clones, gitleaks for the hook check, the plugin
-# binaries for the registration.
-#
-# "macos" is last and only runs there. It is in this list rather than in a
-# platform-specific one so that `--only macos` is a name the parser recognises
-# everywhere, and answers "that step only applies to macOS" rather than
-# "unknown step".
-const STEPS = ["packages" "plugins" "cleanup" "links" "appdirs" "zsh" "neovim" "hooks" "macos"]
-
-def parse-only [only: string]: nothing -> list<string> {
-  if ($only | is-empty) { return $STEPS }
-
-  let wanted = ($only | split row "," | each {|s| $s | str trim } | where {|s| $s | is-not-empty })
-  let unknown = ($wanted | where {|s| $s not-in $STEPS })
-
-  if ($unknown | is-not-empty) {
-    error make {
-      msg: $"unknown step\(s): ($unknown | str join ', ') -- pick from ($STEPS | str join ', ')"
-    }
-  }
-
-  # Keep the canonical order regardless of the order they were typed in.
-  $STEPS | where {|s| $s in $wanted }
-}
+use steps/powershell.nu
+use steps/claude.nu
 
 # home/, then whichever platform/ directories match this machine.
 #
@@ -68,8 +47,12 @@ def link-everything [
 ]: nothing -> nothing {
   log step (if $copy { "Copying dotfiles into place" } else { "Linking dotfiles into place" })
 
-  let sources = (["home"] ++ (distro config-names $system
-    | each {|name| ["platform" $name] | path join }
+  # Windows does not mirror home/: most of it is zsh, tmux and POSIX shell
+  # config with nothing to read it there. What Windows shares arrives through
+  # steps/appdirs.nu, one named application at a time.
+  let base = (if $system.family == "windows" { [] } else { ["home"] })
+  let sources = ($base ++ (distro config-names $system
+    | each {|name| $"platform/($name)" }
     | where {|dir| ($root | path join $dir) | path exists }))
 
   let plans = $sources | each {|dir|
@@ -88,8 +71,9 @@ def link-everything [
   }
 }
 
-def main [
+def --env main [
   --only: string = ""     # comma-separated subset of the steps to run
+  --with: string = ""     # comma-separated opt-in steps to add, e.g. claude
   --copy                  # copy files into place instead of symlinking them
   --dry-run               # print what would be done without doing it
   --home: path            # destination root; defaults to this user's home
@@ -98,8 +82,19 @@ def main [
   let root = $env.FILE_PWD
   let target = ($home | default $nu.home-dir)
   let bin_dir = ($target | path join ".local" "bin")
-  let requested = (parse-only $only)
   let system = (distro detect)
+
+  # Tools installed during this run land in ~/.local/bin (the Claude Code
+  # installer, the upstream fallbacks) or, on Windows, in winget's link
+  # directory. Neither reaches an already-running process's PATH, and later
+  # steps look for what earlier ones installed -- neovim for claude, the
+  # packages step for fnm.
+  let prepends = (if $nu.os-info.name == "windows" {
+    [($env.LOCALAPPDATA | path join "Microsoft" "WinGet" "Links") $bin_dir]
+  } else {
+    [$bin_dir]
+  })
+  $env.PATH = ($env.PATH | prepend $prepends)
 
   log step $"($system.pretty) \(($system.id), family ($system.family), ($system.manager))"
   if $dry_run { log warn "dry run: nothing will be changed" }
@@ -111,16 +106,22 @@ def main [
     }
   }
 
-  # Said only when it was asked for by name. On a Linux run with no --only,
-  # dropping a step that could never apply is not news.
-  let steps = ($requested | where {|s| $s != "macos" or $system.family == "macos" })
-  if ("macos" in $requested) and ($system.family != "macos") and ($only | is-not-empty) {
-    log skipped "macos: that step only applies to macOS"
+  let requested = (steps requested --only $only --with $with)
+  let run = ($requested | where {|s| steps applies $s $system.family })
+  # Said only when it was asked for by name. On a full run, dropping a step
+  # that could never apply here is not news.
+  if ($only | is-not-empty) {
+    for s in ($requested | where {|s| not (steps applies $s $system.family) }) { log skipped (steps platform-note $s) }
   }
 
-  for step in $steps {
+  for step in $run {
     match $step {
-      "packages" => (packages install $system --bin-dir $bin_dir --dry-run=$dry_run)
+      "packages" => {
+        packages install $system --bin-dir $bin_dir --dry-run=$dry_run
+        # MSI installs record themselves only in the registry's PATH; see
+        # lib/winpath.nu for why later steps need to see them.
+        if $system.family == "windows" { winpath refresh --prepend $prepends }
+      }
       "plugins" => (plugins install --home $target --bin-dir $bin_dir --dry-run=$dry_run)
       "cleanup" => (cleanup install $system --dry-run=$dry_run)
       "links" => (link-everything $system --root $root --home $target --copy=$copy --dry-run=$dry_run)
@@ -131,18 +132,25 @@ def main [
       "zsh" => (zsh install --home $target --dry-run=$dry_run)
       "neovim" => {
         if ($nvim_repo | is-empty) {
-          neovim install --home $target --dry-run=$dry_run
+          neovim install $system.family --home $target --dry-run=$dry_run
         } else {
-          neovim install --home $target --repo $nvim_repo --dry-run=$dry_run
+          neovim install $system.family --home $target --repo $nvim_repo --dry-run=$dry_run
         }
       }
       "hooks" => (githooks install --root $root --dry-run=$dry_run)
       "macos" => (macos install --home $target --dry-run=$dry_run)
+      "powershell" => (powershell install --home $target --dry-run=$dry_run)
+      "claude" => (claude install $system.family --dry-run=$dry_run)
+      # An unknown step name should never reach here (steps requested validates
+      # against lib/steps.nu's ORDER and OPT_IN), but fail loudly if it does.
+      _ => { error make { msg: $"install.nu has no dispatch arm for step '($step)' -- add one" } }
     }
   }
 
   log step "Done"
-  if "packages" in $steps {
+  # Not on Windows: nothing there is fetched from upstream releases (see
+  # lib/fallback.nu), so the note would point at an empty directory.
+  if "packages" in $run and $system.family != "windows" {
     log info $"tools fetched from upstream live in ($bin_dir) -- make sure it is on PATH"
   }
 }

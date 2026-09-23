@@ -63,6 +63,7 @@ export def manager-of [family: string]: nothing -> string {
     "fedora" => "dnf"
     "debian" => "apt-get"
     "macos" => "brew"
+    "windows" => "winget"
     _ => "unknown"
   }
 }
@@ -109,6 +110,30 @@ export def describe-macos [version: string]: nothing -> record {
   }
 }
 
+# The same record, for Windows, which has no os-release either.
+#
+# The version is the build number nushell reports, taken as an argument for
+# the same reason describe-macos takes one.
+export def describe-windows [version: string]: nothing -> record {
+  {
+    id: "windows"
+    version: $version
+    pretty: (if ($version | is-empty) { "Windows" } else { $"Windows \(build ($version))" })
+    family: "windows"
+    manager: (manager-of "windows")
+  }
+}
+
+# winget, one exact id at a time, never stopping to ask.
+export def winget-install-command [id: string]: nothing -> list<string> {
+  ["winget" "install" "--exact" "--id" $id "--source" "winget" "--accept-package-agreements" "--accept-source-agreements" "--disable-interactivity"]
+}
+
+# Whether an id is installed is winget's exit code: 0 found, non-zero not.
+export def winget-list-command [id: string]: nothing -> list<string> {
+  ["winget" "list" "--exact" "--id" $id "--source" "winget" "--accept-source-agreements" "--disable-interactivity"]
+}
+
 export def detect [--file: path = "/etc/os-release"]: nothing -> record {
   # Asked of the running nushell rather than by looking for /etc/os-release and
   # inferring macOS from its absence. A Linux box with an unreadable or missing
@@ -117,6 +142,10 @@ export def detect [--file: path = "/etc/os-release"]: nothing -> record {
   if $nu.os-info.name == "macos" {
     let version = (do { ^sw_vers -productVersion } | complete)
     return (describe-macos (if $version.exit_code == 0 { $version.stdout | str trim } else { "" }))
+  }
+
+  if $nu.os-info.name == "windows" {
+    return (describe-windows ($nu.os-info.kernel_version? | default ""))
   }
 
   if not ($file | path exists) {
@@ -131,13 +160,15 @@ export def detect [--file: path = "/etc/os-release"]: nothing -> record {
 # platform/<name>/ mirrors $HOME exactly the way home/ does, and is linked only
 # where <name> matches the machine. Three names can match, from broad to exact:
 #
-#   linux, macos                      the operating system
-#   debian, suse, fedora, macos       the package manager family
-#   ubuntu, opensuse-leap, macos      the distribution itself
+#   linux, macos, windows             the operating system
+#   debian, suse, fedora, macos,
+#     windows                         the package manager family
+#   ubuntu, opensuse-leap, macos,
+#     windows                         the distribution itself
 #
 # Returned in that order, and applied in it, so a file in the more specific
-# directory wins over the same path in a broader one. On macOS all three are
-# "macos", which collapses to a single entry.
+# directory wins over the same path in a broader one. On macOS and Windows all
+# three are the same name, which collapses to a single entry.
 #
 # This is what makes a per-system setting possible at all for the file formats
 # that have no condition of their own. git is the case in hand: includeIf can
@@ -145,7 +176,11 @@ export def detect [--file: path = "/etc/os-release"]: nothing -> record {
 # is running on -- while a plain `[include] path` of a file that does not exist
 # is silently ignored. So the platform directory decides which file exists.
 export def config-names [system: record]: nothing -> list<string> {
-  let os = (if $system.family == "macos" { "macos" } else { "linux" })
+  let os = (match $system.family {
+    "macos" => "macos"
+    "windows" => "windows"
+    _ => "linux"
+  })
   [$os, $system.family, $system.id] | uniq
 }
 
@@ -175,6 +210,9 @@ export def install-command [family: string, packages: list<string>]: nothing -> 
     # and does not need to -- its prefix is owned by the user who installed it.
     # Nor is there a --yes to pass: installing a formula asks nothing.
     "macos" => (["brew" "install"] ++ $packages)
+    # winget takes one package per call. Installing them one at a time is also
+    # what lets a single bad id fail alone -- see steps/packages.nu.
+    "windows" => { error make { msg: "winget installs one id at a time -- use winget-install-command" } }
     _ => { error make { msg: $"no install command for family '($family)'" } }
   }
 }
@@ -227,6 +265,10 @@ export def npm-global-command [family: string, packages: list<string>]: nothing 
   let install = ["npm" "install" "--global"]
   match $family {
     "macos" => ($install ++ $packages)
+    # Node comes from fnm here, which only puts it on PATH inside a shell that
+    # has run `fnm env` -- not this one. fnm exec supplies it for one command.
+    # npm is a .cmd shim on Windows and fnm exec cannot spawn it by bare name.
+    "windows" => (["fnm" "exec" "--using" "default" "--" "npm.cmd" "install" "--global"] ++ $packages)
     _ => (["sudo"] ++ $install ++ $packages)
   }
 }

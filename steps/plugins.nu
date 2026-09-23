@@ -14,6 +14,11 @@
 use ../lib/log.nu
 use ../packages/common.nu
 
+# A plugin's executable name on this platform.
+export def binary-name [name: string]: nothing -> string {
+  if $nu.os-info.name == "windows" { $"nu_plugin_($name).exe" } else { $"nu_plugin_($name)" }
+}
+
 # Where a plugin's executable is, or "" when it is not installed.
 #
 # The directory the running nu came from wins. Plugins speak a protocol that
@@ -21,8 +26,12 @@ use ../packages/common.nu
 # same package, or the same release archive -- is the one that matches. A
 # Fedora box ends up with the distro's old nu in /usr/bin next to the upstream
 # one in ~/.local/bin, and looking there first is what keeps them apart.
+#
+# On Windows the file is nu_plugin_<name>.exe, and checking for the bare name
+# finds nothing even when it is sitting right there -- winget's Nushell
+# package puts every plugin in the same directory as nu.exe.
 export def locate [name: string, --bin-dir: path]: nothing -> string {
-  let binary = $"nu_plugin_($name)"
+  let binary = (binary-name $name)
 
   let beside_nu = ($nu.current-exe | path dirname | path join $binary)
   if ($beside_nu | path exists) { return $beside_nu }

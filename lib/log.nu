@@ -3,6 +3,39 @@
 # Everything user-facing goes through here so that the container tests have a
 # single place to intercept, and so --dry-run reads the same as a real run.
 
+# Render an argument for display: wrap in single quotes if it contains
+# whitespace (space, tab, newline) or special characters, escaping embedded
+# single quotes as '\''. For execution, each element is passed as a separate
+# argument; this is display-only so that dry-run output shows what would
+# actually run.
+export def render [argv: list<string>]: nothing -> string {
+  $argv | each {|arg|
+    if (
+      ($arg | str contains ' ') or
+      ($arg | str contains "\t") or
+      ($arg | str contains "\n") or
+      ($arg | str contains '|') or
+      ($arg | str contains '&') or
+      ($arg | str contains ';') or
+      ($arg | str contains '<') or
+      ($arg | str contains '>') or
+      ($arg | str contains '(') or
+      ($arg | str contains ')') or
+      ($arg | str contains '$') or
+      ($arg | str contains '\\') or
+      ($arg | str contains '`') or
+      ($arg | str contains '"') or
+      ($arg | str contains "'")
+    ) {
+      # Escape embedded single quotes and wrap in single quotes
+      let escaped = ($arg | str replace -a "'" "'\\''")
+      $"'($escaped)'"
+    } else {
+      $arg
+    }
+  } | str join ' '
+}
+
 export def step [msg: string] {
   print $"(ansi cyan_bold)==>(ansi reset) ($msg)"
 }
@@ -36,10 +69,10 @@ export def warn [msg: string] {
 # trustworthy rather than best-effort.
 export def --env shell [argv: list<string>, --dry-run] {
   if $dry_run {
-    info $"would run: ($argv | str join ' ')"
+    info $"would run: (render $argv)"
     return
   }
-  info $"($argv | str join ' ')"
+  info (render $argv)
   let cmd = ($argv | first)
   # `slice` rather than `skip`, so re-adding a command named `skip` to this
   # module cannot silently break command execution again.

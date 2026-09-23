@@ -10,12 +10,13 @@ use ../packages/leap.nu
 use ../packages/fedora.nu
 use ../packages/debian.nu
 use ../packages/macos.nu
+use ../packages/windows.nu
 
 # The shape every overlay is read through, and the value of anything it does
 # not define. An overlay names only the fields it has something to say about --
-# casks and provided are Homebrew and macOS concepts, and the Linux overlays
-# should not have to restate that they have none.
-const EMPTY = { overrides: {}, casks: {}, extra: [], provided: {}, omitted: {}, removed: [] }
+# casks and provided are Homebrew and macOS concepts, fonts is winget's, and an
+# overlay that has none of its own should not have to restate that.
+const EMPTY = { overrides: {}, casks: {}, fonts: {}, extra: [], provided: {}, omitted: {}, removed: [] }
 
 # The overlay for a distro is its family's, with its own laid on top.
 #
@@ -36,6 +37,10 @@ export def overlay-for [distro: record]: nothing -> record {
       overrides: $macos.OVERRIDES, casks: $macos.CASKS, extra: $macos.EXTRA
       provided: $macos.PROVIDED, omitted: $macos.OMITTED, removed: $macos.REMOVED
     })
+    "windows" => ($EMPTY | merge {
+      overrides: $windows.OVERRIDES, fonts: $windows.FONTS, extra: $windows.EXTRA
+      provided: $windows.PROVIDED, omitted: $windows.OMITTED, removed: $windows.REMOVED
+    })
     _ => $EMPTY
   }
 
@@ -47,6 +52,7 @@ export def overlay-for [distro: record]: nothing -> record {
   {
     overrides: ($family.overrides | merge $specific.overrides)
     casks: ($family.casks | merge $specific.casks)
+    fonts: ($family.fonts | merge $specific.fonts)
     extra: ($family.extra ++ $specific.extra)
     provided: ($family.provided | merge $specific.provided)
     omitted: ($family.omitted | merge $specific.omitted)
@@ -86,19 +92,21 @@ export def resolve [distro: record]: nothing -> record {
   let overlay = (overlay-for $distro)
 
   let mapped = $common.PACKAGES | each {|logical|
-    # Casks first: a logical name mapped to a cask is answered by that, and
-    # never also looked up as a formula.
-    if $logical in $overlay.casks {
-      { logical: $logical, packages: [], casks: (expand ($overlay.casks | get $logical)) }
+    # Fonts and casks first: a logical name mapped to either is answered by
+    # that, and never also looked up as a formula or winget id.
+    if $logical in $overlay.fonts {
+      { logical: $logical, packages: [], casks: [], fonts: (expand ($overlay.fonts | get $logical)) }
+    } else if $logical in $overlay.casks {
+      { logical: $logical, packages: [], casks: (expand ($overlay.casks | get $logical)), fonts: [] }
     } else if $logical in $overlay.overrides {
-      { logical: $logical, packages: (expand ($overlay.overrides | get $logical)), casks: [] }
+      { logical: $logical, packages: (expand ($overlay.overrides | get $logical)), casks: [], fonts: [] }
     } else {
-      { logical: $logical, packages: [$logical], casks: [] }
+      { logical: $logical, packages: [$logical], casks: [], fonts: [] }
     }
   }
 
   let unavailable = ($mapped
-    | where {|m| ($m.packages | is-empty) and ($m.casks | is-empty) }
+    | where {|m| ($m.packages | is-empty) and ($m.casks | is-empty) and ($m.fonts | is-empty) }
     | get logical)
 
   let provided_names = ($overlay.provided | columns)
@@ -107,10 +115,14 @@ export def resolve [distro: record]: nothing -> record {
   {
     install: ($mapped | get packages | flatten | append $overlay.extra | uniq)
     casks: ($mapped | get casks | flatten | uniq)
+    fonts: ($mapped | get fonts | flatten | uniq)
     fallback: ($unavailable | where {|t| $t not-in $omitted_names and $t not-in $provided_names })
     provided: ($unavailable | where {|t| $t in $provided_names } | each {|t| { tool: $t, reason: ($overlay.provided | get $t) } })
     omitted: ($unavailable | where {|t| $t in $omitted_names } | each {|t| { tool: $t, reason: ($overlay.omitted | get $t) } })
-    pipx: $common.PIPX
+    # tmuxp, the one pipx application, drives tmux; Windows has no tmux to
+    # drive (see packages/windows.nu's OMITTED for pipx), so there is nothing
+    # for pipx to install there.
+    pipx: (if $distro.family == "windows" { [] } else { $common.PIPX })
     npm: $common.NPM
     removed: $overlay.removed
   }

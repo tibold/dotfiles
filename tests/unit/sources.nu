@@ -4,6 +4,7 @@
 # when something uses it -- so a typo in a rarely-taken branch survives every
 # run until that branch executes. This is the cheap way to find those.
 
+use ../../lib/paths.nu
 use std/testing *
 use std/assert
 
@@ -17,7 +18,7 @@ const STAGING = ($REPO | path join "tests" "container" "staging")
 
 def sources []: nothing -> list<path> {
   let files = ([ "lib" "steps" "tools" "tests" ]
-    | each {|dir| glob ($REPO | path join $dir "**" "*.nu") --no-dir }
+    | each {|dir| glob ($REPO | path join $dir "**" "*.nu" | paths for-glob) --no-dir }
     | flatten
     | append ($REPO | path join "install.nu")
     # This file talks *about* log calls in its test names and messages, which

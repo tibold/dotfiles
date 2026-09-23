@@ -5,6 +5,30 @@ use ../lib/distro.nu
 use ../lib/packages.nu
 use ../lib/fallback.nu
 
+# Which winget ids still need installing, given what `winget list` already
+# found. Pure and separate from install-windows below so the skip/install
+# split can be tested without running winget.
+export def winget-plan [ids: list<string>, installed: list<string>]: nothing -> table {
+  $ids | each {|id| { id: $id, action: (if $id in $installed { "skip" } else { "install" }) } }
+}
+
+# Whether a Nerd Font variant of `name` is already among these font file
+# names. Matches loosely -- "NerdFont" and "Nerd Font" both appear across the
+# family, and the check only needs to rule out reinstalling one that is
+# already there, not identify the exact build.
+export def font-present [name: string, files: list<string>]: nothing -> bool {
+  $files | any {|f| ($f | path basename) =~ $"\(?i\)^($name).*nerd.?font" }
+}
+
+# fnm needs a default Node version before `fnm exec` has anything to run.
+# Installing one is idempotent in principle, but not worth doing every run --
+# `fnm default` already says whether one exists.
+export def fnm-setup [default_output: string]: nothing -> list<list<string>> {
+  if ($default_output | str trim | is-not-empty) { [] } else {
+    [["fnm" "install" "--lts"] ["fnm" "default" "lts-latest"]]
+  }
+}
+
 export def install [
   distro: record
   --bin-dir: path
@@ -13,6 +37,14 @@ export def install [
   let plan = (packages resolve $distro)
 
   log step $"System packages for ($distro.pretty) \(($plan.install | length) packages)"
+
+  # winget has no batch install and no all-or-nothing transaction, so it gets
+  # its own path entirely rather than sharing the apt/dnf/zypper/brew one
+  # below, which assumes exactly one of those things.
+  if $distro.family == "windows" {
+    install-windows $plan --dry-run=$dry_run
+    return
+  }
 
   let refresh = (distro refresh-command $distro.family)
   if ($refresh | is-not-empty) {
@@ -71,5 +103,66 @@ export def install [
     # where node came from -- see distro npm-global-command.
     log step "Node packages (npm, global)"
     log shell (distro npm-global-command $distro.family $plan.npm) --dry-run=$dry_run
+  }
+}
+
+# winget, one id at a time.
+#
+# Unlike the Linux transaction, a failure is per package: winget has no
+# all-or-nothing install, and one id failing -- a network blip, a publisher's
+# installer refusing -- is no reason to leave the other twenty uninstalled.
+def install-windows [plan: record, --dry-run]: nothing -> nothing {
+  let installed = ($plan.install | where {|id|
+    let argv = (distro winget-list-command $id)
+    (do { ^($argv | first) ...($argv | slice 1..) } | complete).exit_code == 0
+  })
+  for row in (winget-plan $plan.install $installed) {
+    if $row.action == "skip" { log skipped $"($row.id) already installed"; continue }
+    try {
+      log shell (distro winget-install-command $row.id) --dry-run=$dry_run
+    } catch {
+      log warn $"($row.id) did not install -- carrying on; re-run to retry"
+    }
+  }
+
+  for font in $plan.fonts {
+    let dirs = [
+      ($env.LOCALAPPDATA | path join "Microsoft" "Windows" "Fonts")
+      ($env.WINDIR | path join "Fonts")
+    ]
+    let files = ($dirs | where {|d| $d | path exists } | each {|d| ls $d | get name } | flatten)
+    if (font-present $font $files) { log skipped $"($font) nerd font already installed"; continue }
+    try {
+      log shell ["oh-my-posh" "font" "install" $font "--headless"] --dry-run=$dry_run
+    } catch {
+      log warn $"could not install the ($font) nerd font -- the prompt and status line separators need it; `oh-my-posh font install ($font)` by hand"
+    }
+  }
+
+  for present in $plan.provided { log skipped $"($present.tool): in the base system -- ($present.reason)" }
+  for skipped in $plan.omitted { log skipped $"($skipped.tool): ($skipped.reason)" }
+
+  if (which fnm | is-not-empty) or $dry_run {
+    let current = (if (which fnm | is-empty) { "" } else { do { ^fnm default } | complete | get stdout })
+    # Per step, like the winget ids above: a failed Node download is no reason
+    # to abort the steps after this one. The npm packages need that Node, so
+    # they are skipped rather than attempted against nothing.
+    let node_ready = (try {
+      for cmd in (fnm-setup $current) { log shell $cmd --dry-run=$dry_run }
+      true
+    } catch {
+      log warn "fnm could not set up a default Node -- skipping the npm packages; re-run to retry"
+      false
+    })
+    if $node_ready and ($plan.npm | is-not-empty) {
+      log step "Node packages (npm, global, through fnm)"
+      try {
+        log shell (distro npm-global-command "windows" $plan.npm) --dry-run=$dry_run
+      } catch {
+        log warn "the global npm packages did not install -- carrying on; re-run to retry"
+      }
+    }
+  } else {
+    log warn "fnm is not on PATH yet -- open a new shell and re-run `nu install.nu --only packages` for node and its packages"
   }
 }

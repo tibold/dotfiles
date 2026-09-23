@@ -1,6 +1,9 @@
 use ../../lib/packages.nu
 use ../../lib/fallback.nu
 use ../../packages/common.nu
+# By name, not `use ... as steps`: the module name `packages` is already taken
+# by lib/packages.nu above, and steps/packages.nu would shadow it.
+use ../../steps/packages.nu [winget-plan font-present fnm-setup]
 use std/testing *
 use std/assert
 
@@ -9,6 +12,7 @@ const LEAP = { id: "opensuse-leap", family: "suse" }
 const FEDORA = { id: "fedora", family: "fedora" }
 const UBUNTU = { id: "ubuntu", family: "debian" }
 const MACOS = { id: "macos", family: "macos" }
+const WINDOWS = { id: "windows", family: "windows" }
 
 const ALL = [
   { id: "opensuse-tumbleweed", family: "suse" }
@@ -16,6 +20,7 @@ const ALL = [
   { id: "fedora", family: "fedora" }
   { id: "ubuntu", family: "debian" }
   { id: "macos", family: "macos" }
+  { id: "windows", family: "windows" }
 ]
 
 # The four that install from a Linux distribution's archive. Separated out
@@ -231,6 +236,75 @@ export def "the nushell plugins come with the shell on macOS" [] {
   assert equal ($install | where {|p| $p == "nushell" } | length) 1
 }
 
+# --- Windows --------------------------------------------------------------------
+
+@test
+export def "Windows takes nothing from an upstream download" [] {
+  # lib/fallback.nu fetches Linux binaries only.
+  assert equal (packages resolve $WINDOWS).fallback []
+}
+
+@test
+export def "Windows maps tmux and htop onto their Windows counterparts" [] {
+  let r = (packages resolve $WINDOWS)
+  assert ("marlocarlo.psmux" in $r.install)
+  assert ("marlocarlo.pstop" in $r.install)
+  assert not ("tmux" in $r.install) "a logical name leaked through to winget"
+}
+
+@test
+export def "every Windows package is a winget id" [] {
+  # Publisher.Package -- a bare logical name here means an override is missing.
+  for id in (packages resolve $WINDOWS).install {
+    assert ($id =~ '^[A-Za-z0-9-]+\.[A-Za-z0-9.+-]+$') $"($id) is not a winget id"
+  }
+}
+
+@test
+export def "a font is never handed to winget" [] {
+  let r = (packages resolve $WINDOWS)
+  assert equal $r.fonts ["0xProto"]
+  assert not ("0xProto" in $r.install)
+  assert equal (packages resolve $FEDORA).fonts []
+}
+
+@test
+export def "the nushell plugins come with the shell on Windows" [] {
+  # winget's Nushell package puts nu_plugin_*.exe beside nu.exe, so they are
+  # provided by the nushell id rather than installed or omitted.
+  let r = (packages resolve $WINDOWS)
+  assert ("nushell-plugins" in ($r.provided | get tool))
+  assert not ("nushell-plugins" in ($r.omitted | get tool))
+  assert ("Nushell.Nushell" in $r.install)
+}
+
+@test
+export def "Windows installs no pipx applications" [] {
+  assert equal (packages resolve $WINDOWS).pipx []
+}
+
+# --- steps/packages.nu on Windows ----------------------------------------------
+
+@test
+export def "an installed winget package is skipped" [] {
+  let plan = (winget-plan ["Git.Git" "jqlang.jq"] ["Git.Git"])
+  assert equal ($plan | where id == "Git.Git" | first | get action) "skip"
+  assert equal ($plan | where id == "jqlang.jq" | first | get action) "install"
+}
+
+@test
+export def "a Meslo nerd font already installed is recognised" [] {
+  assert (font-present "meslo" ["C:/Users/u/AppData/Local/Microsoft/Windows/Fonts/MesloLGSNerdFontMono-Regular.ttf"])
+  assert not (font-present "meslo" ["C:/Windows/Fonts/Meslo-Plain.ttf"]) "not a nerd font"
+  assert not (font-present "meslo" [])
+}
+
+@test
+export def "fnm gets an LTS default only when it has none" [] {
+  assert equal (fnm-setup "v24.18.0") []
+  assert equal (fnm-setup "") [["fnm" "install" "--lts"] ["fnm" "default" "lts-latest"]]
+}
+
 # --- archive layouts ----------------------------------------------------------
 
 @test
@@ -262,6 +336,11 @@ export def "an unknown tool has a layout rather than an error" [] {
 
 @test
 export def "a kept archive lives beside bin-dir rather than inside it" [] {
+  # Skipped on Windows because the fixture is a Unix path literal: share-dir
+  # joins it with native separators, and the expected string would never
+  # match there. The logic is the same everywhere.
+  if $nu.os-info.name == "windows" { return }
+
   # ~/.local/bin is a directory of commands. Two hundred files of bundled .NET
   # runtime unpacked into it would make it something else.
   let share = (fallback share-dir "git-credential-manager" --bin-dir "/home/someone/.local/bin")
@@ -270,6 +349,12 @@ export def "a kept archive lives beside bin-dir rather than inside it" [] {
 
 @test
 export def "a kept archive is installed whole and linked from bin-dir" [] {
+  # Skipped on Windows: install-directory shells out to the Unix `cp -R`,
+  # `chmod` and `ln`, which a Windows machine only has when Git's usr/bin
+  # happens to be on PATH. It never runs there -- lib/fallback.nu refuses
+  # anything but Linux archives.
+  if $nu.os-info.name == "windows" { return }
+
   # Exercises the real file handling with a fabricated archive, since the
   # download path cannot run in a unit test. The shape is git-credential-
   # manager's: one executable that does not work without the libraries beside
@@ -306,6 +391,10 @@ export def "a kept archive is installed whole and linked from bin-dir" [] {
 
 @test
 export def "reinstalling a kept archive does not leave the old files behind" [] {
+  # Skipped on Windows for the reason in the test above: install-directory
+  # needs the Unix `cp`, `chmod` and `ln`.
+  if $nu.os-info.name == "windows" { return }
+
   # A half-old, half-new set of runtime files is worse than either version, so
   # the directory is replaced rather than merged.
   let base = (mktemp --directory --tmpdir "dotfiles-fallback-XXXXXX")

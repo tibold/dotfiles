@@ -13,7 +13,11 @@
 # Each module runs in its own `nu` subprocess. That costs a process per file
 # and buys two things worth more: a test cannot leak state into the next one,
 # and a module that fails to even parse is reported as a failure rather than
-# taking the runner down with it.
+# taking the runner down with it. The subprocess is this same nu, by path, so
+# the suite runs however it was started -- including from a shell where nu is
+# not on PATH at all.
+
+use ../lib/paths.nu
 
 const DISCOVER = "
 scope commands
@@ -23,7 +27,10 @@ scope commands
 "
 
 def discover [file: path]: nothing -> list<string> {
-  let result = (do { ^nu --no-config-file --commands $"use ($file) *($DISCOVER)" } | complete)
+  # Forward slashes: the path is spliced into nushell source below, where a
+  # backslash would start an escape sequence.
+  let file = ($file | paths for-glob)
+  let result = (do { ^$nu.current-exe --no-config-file --commands $"use ($file) *($DISCOVER)" } | complete)
 
   if $result.exit_code != 0 {
     error make { msg: $"could not load ($file):\n($result.stderr)" }
@@ -54,6 +61,9 @@ const RESERVED_FIRST = [
 
 # Build a script that calls every test in the module and reports what happened.
 def run-module [file: path]: nothing -> table {
+  # Forward slashes: the path is spliced into nushell source below, where a
+  # backslash would start an escape sequence.
+  let file = ($file | paths for-glob)
   let names = (try {
     discover $file
   } catch {|e|
@@ -92,10 +102,10 @@ def run-module [file: path]: nothing -> table {
   # The results go to a file rather than stdout because the code under test is
   # allowed to print. Mixing its output into the payload would make a passing
   # test that happens to log look like a corrupt result.
-  let outfile = (mktemp --tmpdir "dotfiles-test-XXXXXX.nuon")
+  let outfile = (mktemp --tmpdir "dotfiles-test-XXXXXX.nuon" | paths for-glob)
   let source = $"use ($file) *\n[ ($calls) ] | to nuon | save --force --raw \"($outfile)\""
 
-  let result = (do { ^nu --no-config-file --commands $source } | complete)
+  let result = (do { ^$nu.current-exe --no-config-file --commands $source } | complete)
 
   if $result.exit_code != 0 {
     rm --force $outfile
@@ -111,7 +121,7 @@ def run-module [file: path]: nothing -> table {
 }
 
 def main [--filter: string = ""] {
-  let files = (glob ($env.FILE_PWD | path join "unit" "*.nu")
+  let files = (glob ($env.FILE_PWD | path join "unit" "*.nu" | paths for-glob)
     | where {|f| ($filter | is-empty) or ($f =~ $filter) }
     | sort)
 

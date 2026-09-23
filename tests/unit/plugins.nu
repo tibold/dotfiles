@@ -38,11 +38,19 @@ export def "polars is not on the list" [] {
 @test
 export def "a plugin in bin-dir is found" [] {
   let dir = (mktemp --directory --tmpdir "dotfiles-plugins-XXXXXX")
-  touch ($dir | path join "nu_plugin_zzz")
+  touch ($dir | path join (plugins binary-name "zzz"))
 
-  assert equal (plugins locate "zzz" --bin-dir $dir) ($dir | path join "nu_plugin_zzz")
+  assert equal (plugins locate "zzz" --bin-dir $dir) ($dir | path join (plugins binary-name "zzz"))
 
   rm --recursive --force $dir
+}
+
+@test
+export def "a plugin executable carries the extension of the platform" [] {
+  # Looking for the bare name on Windows found nothing, and every run warned
+  # that plugins sitting beside nu.exe were not installed.
+  let expected = (if $nu.os-info.name == "windows" { "nu_plugin_query.exe" } else { "nu_plugin_query" })
+  assert equal (plugins binary-name "query") $expected
 }
 
 @test
@@ -54,7 +62,7 @@ export def "a plugin that is nowhere yields an empty path" [] {
 
 @test
 export def "the registry for another home lives under that home" [] {
-  assert equal (plugins registry --home "/elsewhere") "/elsewhere/.config/nushell/plugin.msgpackz"
+  assert equal (plugins registry --home "/elsewhere") ("/elsewhere" | path join ".config" "nushell" "plugin.msgpackz")
 }
 
 @test
