@@ -174,8 +174,8 @@ export def "macOS takes everything from Homebrew rather than from a download" []
 @test
 export def "a cask is never handed to brew as a formula" [] {
   let resolved = (packages resolve $MACOS)
-  assert ("font-meslo-lg-nerd-font" in $resolved.casks) "the Nerd Font should be installed as a cask"
-  assert ("font-meslo-lg-nerd-font" not-in $resolved.install) "a cask token is not a formula name"
+  assert ("font-0xproto-nerd-font" in $resolved.casks) "the Nerd Font should be installed as a cask"
+  assert ("font-0xproto-nerd-font" not-in $resolved.install) "a cask token is not a formula name"
   assert ("nerd-fonts" not-in $resolved.install) "the logical name should not leak through either"
 }
 

@@ -120,7 +120,7 @@ macOS has a fourth mapping, because Homebrew has two halves:
 ```nu
 # packages/macos.nu
 export const CASKS = {
-  nerd-fonts: "font-meslo-lg-nerd-font"   # installed with brew install --cask
+  nerd-fonts: "font-0xproto-nerd-font"    # installed with brew install --cask
 }
 ```
 
@@ -298,11 +298,11 @@ Most of `common.nu` is a formula. Three groups are not:
 `podman machine init` once, then `podman machine start`. That is left to you
 rather than done by the installer, because it downloads and boots a VM.
 
-The font is `font-meslo-lg-nerd-font` **pending a visual review** -- it is what
-Oh My Zsh's documentation assumes and what the `jonathan` theme and the tmux
-status separators were drawn against, so it is the safe default rather than a
-considered preference. `font-jetbrains-mono-nerd-font` and
-`font-hack-nerd-font` are one-word changes in `packages/macos.nu`.
+The font is 0xProto (`font-0xproto-nerd-font`), picked by eye in Rio after
+Meslo -- Oh My Zsh's default, and this repo's first choice -- read poorly at
+terminal sizes. Windows installs the same family, and Rio's config names it;
+`tests/unit/configs.nu` fails if the three drift apart. Any other Nerd Font is
+a one-word change in each.
 
 `lib/fallback.nu` stays Linux-only, and refuses to run anywhere else rather
 than quietly unpacking an ELF binary into `~/.local/bin`. If a future Homebrew

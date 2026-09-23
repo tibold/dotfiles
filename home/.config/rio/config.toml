@@ -5,6 +5,10 @@
 #
 # Linked to ~/.config/rio, which is where Rio looks on macOS and Linux.
 # Windows reads %LOCALAPPDATA%\rio; see steps/appdirs.nu.
+#
+# Rio reloads this file when something changes in the directory it reads from.
+# On Windows that directory holds only a link to this file, so editing it here
+# changes nothing Rio is watching: restart Rio to see an edit.
 
 # macOS sends neither Alt nor Meta for Option, so Alt bindings do nothing --
 # dirhistory's Alt+arrows, zsh's Alt+b and Alt+f. 'both' rather than 'left',
@@ -18,12 +22,12 @@ scrollback-history-limit = 100000
 hide-mouse-cursor-when-typing = true
 
 [fonts]
-size = 14
-# The family the cask in packages/macos.nu installs. Naming one that merely
+size = 12
+# The family the Nerd Font install puts on every workstation: FONTS in
+# packages/windows.nu, CASKS in packages/macos.nu. Naming one that merely
 # happens to be on this machine leaves a fresh one without the glyph range the
-# tmux separators need. "S" is the tightest line gap, "Mono" keeps every glyph
-# one cell wide. MesloLGSDZ is the same with dotted zeros.
-family = "MesloLGS Nerd Font Mono"
+# prompt and tmux separators need. "Mono" keeps every glyph one cell wide.
+family = "0xProto Nerd Font Mono"
 
 [navigation]
 # Invisible while tmux does the multiplexing, already there if it goes.
@@ -40,8 +44,10 @@ blinking = false
 # split-active match .tmux.conf's pane borders, so Rio's splits look like
 # tmux's panes.
 #
-# The sixteen ANSI colours are deliberately absent: ArchPillar defines
-# surfaces and accents, not an ANSI ramp.
+# The sixteen ANSI colours below come from the same tokens. They are the
+# terminal's palette, so everything that prints ANSI colour inside Rio -- zsh,
+# pwsh, tmux and psmux panes, git, lazygit, ssh sessions -- uses them without
+# configuring anything else.
 [colors]
 background = '#05060A'
 foreground = '#9094A8'
@@ -51,5 +57,46 @@ selection-background = '#262838'
 selection-foreground = '#E8E9F4'
 split        = '#1A1C28'
 split-active = '#22F5A8'
-tabs        = '#12131C'
-tabs-active = '#22F5A8'
+
+# Tab text, not tab backgrounds: `tabs` is the inactive tabs' text and border,
+# `tabs-active` the current tab's text. Both are the brightest token because
+# the text also sits on the six colours Rio's tab-colour picker paints, which
+# are hard-coded in Rio (PICKER_COLORS in island.rs): --fg-2 vanished on them,
+# and --accent did on orange. The current tab is marked by Rio's own highlight,
+# not by its text colour. A lone tab draws its title in the tab's own colour.
+tabs        = '#E8E9F4'   # --fg-1
+tabs-active = '#E8E9F4'   # --fg-1
+
+# ArchPillar cyberpunk has no blue, so blue is derived; the bright variants
+# are the tokens lifted toward white.
+black   = '#12131C'   # --surface-2
+red     = '#FF3B57'   # --danger
+green   = '#22F5A8'   # --accent
+yellow  = '#FFB400'   # --warning
+blue    = '#3A8BFF'   # derived: no blue token
+magenta = '#B14AED'   # --accent-3
+cyan    = '#00E5FF'   # --accent-2
+white   = '#9094A8'   # --fg-2
+# Bright black is the terminal's "dim text" colour -- pwsh's parameters and
+# comments, git's faded output, jq's null -- so it must read on the background.
+# --neutral-500 did not; this is halfway from it to --fg-2.
+light-black   = '#5B5E70'   # derived: between --neutral-500 and --fg-2
+light-red     = '#FF6B81'
+light-green   = '#7CFAC9'
+light-yellow  = '#FFCC4D'
+light-blue    = '#6FA8FF'
+light-magenta = '#C97BF3'
+light-cyan    = '#66F0FF'
+light-white   = '#E8E9F4'   # --fg-1
+
+# On Linux and macOS Rio starts the login shell, which steps/zsh.nu makes zsh.
+# Windows has no such thing and Rio falls back to cmd, so name pwsh there --
+# the shell platform/windows/.config/powershell/profile.ps1 is written for.
+#
+# Started in the home directory, because Rio otherwise inherits the directory
+# it was launched from -- System32 from the taskbar or Start menu. Not
+# working-dir: that would need a path valid on every platform. On Windows Rio
+# opens every tab this way (it has no current-directory lookup there), so
+# nothing is lost by it.
+[platform]
+windows.shell = { program = "pwsh", args = ["-NoLogo", "-WorkingDirectory", "~"] }

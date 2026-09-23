@@ -53,16 +53,15 @@ export const OVERRIDES = {
 # Written the same way as OVERRIDES: logical name -> cask token. A tool that
 # appears here is accounted for, so it does not need an entry anywhere else.
 export const CASKS = {
-  # PENDING VISUAL REVIEW: MesloLG is the font Oh My Zsh's own documentation
-  # assumes and what the jonathan theme and the tmux status separators were
-  # drawn against, so it is the safe default rather than a considered
-  # preference. Look at it in the terminal before treating this as settled;
-  # font-jetbrains-mono-nerd-font and font-hack-nerd-font are the two obvious
-  # alternatives and are a one-word change here.
+  # 0xProto, picked by eye in Rio over Meslo (the Oh My Zsh default this list
+  # started with), which read poorly at terminal sizes. The same family is in
+  # FONTS in packages/windows.nu and in Rio's config; tests/unit/configs.nu
+  # fails when the three disagree. Any other Nerd Font is a one-word change
+  # here and there.
   #
   # Installing a font is only useful on a machine someone is sitting at, which
   # is why the Linux overlays omit this and this one does not.
-  nerd-fonts: "font-meslo-lg-nerd-font"
+  nerd-fonts: "font-0xproto-nerd-font"
 
   # Microsoft's own macOS package, which the cask wraps. It carries its own
   # .NET runtime, so it needs no SDK -- the same reason the Linux side takes
