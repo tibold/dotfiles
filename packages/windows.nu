@@ -62,11 +62,16 @@ export const OVERRIDES = {
   pipx: null
 }
 
-# Not winget packages. Installed by `oh-my-posh font install <name> --headless`
+# Not winget packages. Installed by `oh-my-posh font install <install> --headless`
 # -- Windows' counterpart to Homebrew's casks for the one font this repo needs.
 # The terminal is on this machine, so the font belongs here, as on macOS.
+#
+# Two names, because Nerd Fonts renames some of what it patches: oh-my-posh
+# installs "SourceCodePro", and the files it puts down are SauceCodePro*. The
+# second is what steps/packages.nu looks for to skip an installed font, and the
+# family Rio's config names.
 export const FONTS = {
-  nerd-fonts: "0xProto"
+  nerd-fonts: { install: "SourceCodePro", files: "SauceCodePro" }
 }
 
 # Windows-only tools with no logical name elsewhere.

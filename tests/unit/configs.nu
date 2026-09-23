@@ -412,8 +412,10 @@ export def "the font Rio asks for is the font this repo installs" [] {
   let flat = ($family | str downcase | str replace --all ' ' '')
   assert ($flat | str starts-with $stem) $"Rio asks for '($family)' but packages/macos.nu installs ($cask) -- one of the two moved without the other"
 
-  let windows_font = ($windows.FONTS | get nerd-fonts)
-  assert ($flat | str starts-with ($windows_font | str downcase)) $"Rio asks for '($family)' but packages/windows.nu installs ($windows_font) -- one of the two moved without the other"
+  # Compared by the patched family's name, which is what Rio asks for: Nerd
+  # Fonts renames some of what it patches (Source Code Pro -> SauceCodePro).
+  let windows_font = ($windows.FONTS | get nerd-fonts | get files)
+  assert ($flat | str starts-with ($windows_font | str lowercase)) $"Rio asks for '($family)' but packages/windows.nu installs ($windows_font) -- one of the two moved without the other"
 }
 
 @test

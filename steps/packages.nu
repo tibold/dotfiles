@@ -139,11 +139,11 @@ def install-windows [plan: record, --dry-run]: nothing -> nothing {
       ($env.WINDIR | path join "Fonts")
     ]
     let files = ($dirs | where {|d| $d | path exists } | each {|d| ls $d | get name } | flatten)
-    if (font-present $font $files) { log skipped $"($font) nerd font already installed"; continue }
+    if (font-present $font.files $files) { log skipped $"($font.files) nerd font already installed"; continue }
     try {
-      log shell ["oh-my-posh" "font" "install" $font "--headless"] --dry-run=$dry_run
+      log shell ["oh-my-posh" "font" "install" $font.install "--headless"] --dry-run=$dry_run
     } catch {
-      log warn $"could not install the ($font) nerd font -- the prompt and status line separators need it; `oh-my-posh font install ($font)` by hand"
+      log warn $"could not install the ($font.files) nerd font -- the prompt and status line separators need it; `oh-my-posh font install ($font.install)` by hand"
     }
   }
 

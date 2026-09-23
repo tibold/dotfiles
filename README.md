@@ -153,7 +153,7 @@ macOS has a fourth mapping, because Homebrew has two halves:
 ```nu
 # packages/macos.nu
 export const CASKS = {
-  nerd-fonts: "font-0xproto-nerd-font"    # installed with brew install --cask
+  nerd-fonts: "font-sauce-code-pro-nerd-font"   # installed with brew install --cask
 }
 ```
 
@@ -380,11 +380,16 @@ Most of `common.nu` is a formula. Three groups are not:
 `podman machine init` once, then `podman machine start`. That is left to you
 rather than done by the installer, because it downloads and boots a VM.
 
-The font is 0xProto (`font-0xproto-nerd-font`), picked by eye in Rio after
-Meslo -- Oh My Zsh's default, and this repo's first choice -- read poorly at
-terminal sizes. Windows installs the same family, and Rio's config names it;
-`tests/unit/configs.nu` fails if the three drift apart. Any other Nerd Font is
-a one-word change in each.
+The font is SauceCodePro, Nerd Fonts' patched Source Code Pro
+(`font-sauce-code-pro-nerd-font`), picked by eye in Rio. It needs all four
+styles -- regular, bold, italic and bold italic -- which ruled out 0xProto;
+Meslo, Oh My Zsh's default and this repo's first choice, read poorly. Windows
+installs the same family, and Rio's config names it; `tests/unit/configs.nu`
+fails if the three drift apart.
+
+At size 14 its lowercase lands almost exactly on whole pixels. That matters
+more than it sounds: Rio draws glyphs without the font's hinting, so a size
+whose x-height falls mid-pixel (13, here) looks soft.
 
 `lib/fallback.nu` stays Linux-only, and refuses to run anywhere else rather
 than quietly unpacking an ELF binary into `~/.local/bin`. If a future Homebrew
@@ -482,8 +487,9 @@ fnm's prefix belongs to the user.
 
 The Nerd Font is winget's counterpart to Homebrew's `CASKS` -- `FONTS` in
 `packages/windows.nu` -- installed with
-`oh-my-posh font install 0xProto --headless` and skipped when a 0xProto Nerd
-Font is already in the user or system font directory. Installed for the same
+`oh-my-posh font install SourceCodePro --headless` and skipped when a
+SauceCodePro Nerd Font is already in the user or system font directory -- two
+names, because Nerd Fonts renames what it patches. Installed for the same
 reason macOS installs its cask: the terminal is on this machine, not something
 reached over ssh, so the font belongs here.
 

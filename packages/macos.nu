@@ -60,15 +60,14 @@ export const OVERRIDES = {
 # Written the same way as OVERRIDES: logical name -> cask token. A tool that
 # appears here is accounted for, so it does not need an entry anywhere else.
 export const CASKS = {
-  # 0xProto, picked by eye in Rio over Meslo (the Oh My Zsh default this list
-  # started with), which read poorly at terminal sizes. The same family is in
-  # FONTS in packages/windows.nu and in Rio's config; tests/unit/configs.nu
-  # fails when the three disagree. Any other Nerd Font is a one-word change
-  # here and there.
+  # SauceCodePro (Source Code Pro, patched), picked by eye in Rio. Meslo, the
+  # Oh My Zsh default this list started with, read poorly; 0xProto has no bold
+  # italic. The same family is in FONTS in packages/windows.nu and in Rio's
+  # config; tests/unit/configs.nu fails when the three disagree.
   #
   # Installing a font is only useful on a machine someone is sitting at, which
   # is why the Linux overlays omit this and this one does not.
-  nerd-fonts: "font-0xproto-nerd-font"
+  nerd-fonts: "font-sauce-code-pro-nerd-font"
 
   # Microsoft's own macOS package, which the cask wraps. It carries its own
   # .NET runtime, so it needs no SDK -- the same reason the Linux side takes

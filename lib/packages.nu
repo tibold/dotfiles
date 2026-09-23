@@ -62,11 +62,12 @@ export def overlay-for [distro: record]: nothing -> record {
   }
 }
 
-# An override is a rename (string), a split (list), or "not here" (null).
-def expand [value: any]: nothing -> list<string> {
+# An override is a rename (string), a split (list), or "not here" (null). A
+# FONTS entry is a record naming both what to install and what it is called.
+def expand [value: any]: nothing -> list<any> {
   if $value == null {
     []
-  } else if ($value | describe) == "string" {
+  } else if ($value | describe) == "string" or ($value | describe | str starts-with "record") {
     [$value]
   } else {
     $value

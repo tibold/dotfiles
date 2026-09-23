@@ -179,8 +179,8 @@ export def "macOS takes everything from Homebrew rather than from a download" []
 @test
 export def "a cask is never handed to brew as a formula" [] {
   let resolved = (packages resolve $MACOS)
-  assert ("font-0xproto-nerd-font" in $resolved.casks) "the Nerd Font should be installed as a cask"
-  assert ("font-0xproto-nerd-font" not-in $resolved.install) "a cask token is not a formula name"
+  assert ("font-sauce-code-pro-nerd-font" in $resolved.casks) "the Nerd Font should be installed as a cask"
+  assert ("font-sauce-code-pro-nerd-font" not-in $resolved.install) "a cask token is not a formula name"
   assert ("nerd-fonts" not-in $resolved.install) "the logical name should not leak through either"
 }
 
@@ -263,8 +263,8 @@ export def "every Windows package is a winget id" [] {
 @test
 export def "a font is never handed to winget" [] {
   let r = (packages resolve $WINDOWS)
-  assert equal $r.fonts ["0xProto"]
-  assert not ("0xProto" in $r.install)
+  assert equal $r.fonts [{ install: "SourceCodePro", files: "SauceCodePro" }]
+  assert not ("SourceCodePro" in $r.install)
   assert equal (packages resolve $FEDORA).fonts []
 }
 
@@ -290,6 +290,16 @@ export def "an installed winget package is skipped" [] {
   let plan = (winget-plan ["Git.Git" "jqlang.jq"] ["Git.Git"])
   assert equal ($plan | where id == "Git.Git" | first | get action) "skip"
   assert equal ($plan | where id == "jqlang.jq" | first | get action) "install"
+}
+
+@test
+export def "an installed font is found by its patched name, not its install name" [] {
+  # Nerd Fonts renames what it patches -- Source Code Pro becomes SauceCodePro
+  # -- so the files on disk do not start with the name oh-my-posh installs.
+  # Looking for the install name would reinstall the font on every run.
+  let files = ["C:/Users/u/AppData/Local/Microsoft/Windows/Fonts/SauceCodeProNerdFontMono-Regular.ttf"]
+  assert (font-present "SauceCodePro" $files)
+  assert not (font-present "SourceCodePro" $files)
 }
 
 @test

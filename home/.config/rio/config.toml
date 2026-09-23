@@ -22,12 +22,12 @@ scrollback-history-limit = 100000
 hide-mouse-cursor-when-typing = true
 
 [fonts]
-size = 12
+size = 14
 # The family the Nerd Font install puts on every workstation: FONTS in
 # packages/windows.nu, CASKS in packages/macos.nu. Naming one that merely
 # happens to be on this machine leaves a fresh one without the glyph range the
 # prompt and tmux separators need. "Mono" keeps every glyph one cell wide.
-family = "0xProto Nerd Font Mono"
+family = "SauceCodePro Nerd Font Mono"
 
 [navigation]
 # Invisible while tmux does the multiplexing, already there if it goes.
