@@ -41,6 +41,17 @@ hide-if-single = true
 # Shape is left to zsh, which changes it per vi mode.
 blinking = false
 
+# A trail from where the cursor was to where it landed, so a jump -- a search
+# match, a split, a mark in nvim -- can be followed by eye. Rio's defaults fit
+# as they are: the trail takes the cursor's colour, and a move of two cells or
+# fewer starts none, so typing and hjkl draw nothing. A little faster than Rio's
+# [100, 400] ms: long enough to see where the cursor came from, gone before
+# the eye has moved on. The pair is how long the trail's fastest and slowest
+# corners take to catch up; the gap between them is what stretches it.
+[effects]
+trail-cursor = true
+trail-cursor-decay = [80, 320]
+
 # ArchPillar cyberpunk, the same values ~/.config/tmux/themes name. split and
 # split-active match .tmux.conf's pane borders, so Rio's splits look like
 # tmux's panes.
