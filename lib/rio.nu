@@ -149,7 +149,8 @@ def pwsh-exe []: nothing -> any {
 # A PowerShell single-quoted string: nothing inside is interpreted except a
 # doubled quote.
 def ps-quote [text: string]: nothing -> string {
-  $"'($text | str replace --all "'" "''")'"
+  let escaped = ($text | str replace --all "'" "''")
+  $"'($escaped)'"
 }
 
 def pwsh-query [pwsh: string, script: string]: nothing -> string {

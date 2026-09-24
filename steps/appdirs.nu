@@ -170,7 +170,8 @@ def point-rio-at-repo [root: path, --dry-run]: nothing -> nothing {
   # Through .NET rather than the registry directly: SetEnvironmentVariable also
   # tells Explorer the environment changed, so a Rio opened from the Start menu
   # afterwards has it without signing out.
-  let script = $"[Environment]::SetEnvironmentVariable\('RIO_CONFIG_HOME', '($wanted | str replace --all "'" "''")', 'User')"
+  let escaped = ($wanted | str replace --all "'" "''")
+  let script = $"[Environment]::SetEnvironmentVariable\('RIO_CONFIG_HOME', '($escaped)', 'User')"
   log shell ["pwsh" "-NoProfile" "-NonInteractive" "-Command" $script] --dry-run=$dry_run
 }
 
