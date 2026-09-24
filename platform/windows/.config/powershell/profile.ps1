@@ -42,6 +42,14 @@ function reset-mouse-tracking {
     [Console]::Write("`e[?1000l`e[?1002l`e[?1003l`e[?1005l`e[?1006l")
 }
 
+# UTF-8 for native commands' output, before anything below reads it. pwsh
+# otherwise decodes it with the OEM code page (437). oh-my-posh reads its
+# prompt that way whenever the language mode says ConstrainedLanguage -- which
+# an App Control audit policy makes it say while restricting nothing -- and
+# every glyph comes out mangled.
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$OutputEncoding = [Text.Encoding]::UTF8
+
 if (Get-Command fnm -ErrorAction SilentlyContinue) {
     fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
 }
