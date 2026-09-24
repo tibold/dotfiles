@@ -139,6 +139,41 @@ export def plan-entry [
   }
 }
 
+# Where Rio should read its config on Windows: straight from this repository.
+#
+# Rio reloads its config when something changes in the directory it watches,
+# and on Windows that watch only sees changes made in that directory. A link
+# there is enough to read the config but not to notice it changing -- editing
+# home/.config/rio/config.toml changes a file somewhere else. Rio takes its
+# config directory from RIO_CONFIG_HOME when that is set, so pointing it at the
+# real directory makes every edit, and every `git pull`, reload a running Rio.
+#
+# The whole of %LOCALAPPDATA%\rio cannot be linked instead: Rio keeps its cache
+# there too (its shell integration scripts), and that would land in the repo.
+# The file link above stays, for a Rio started before the variable reaches it
+# and for --copy installs, which have no repository to point at.
+export def rio-config-home [root: path]: nothing -> path {
+  $root | path join "home" ".config" "rio"
+}
+
+def point-rio-at-repo [root: path, --dry-run]: nothing -> nothing {
+  let wanted = (rio-config-home $root)
+  let current = (try { registry query --hkcu Environment RIO_CONFIG_HOME | get value } catch { "" })
+  if ($current | str lowercase) == ($wanted | str lowercase) {
+    log skipped $"RIO_CONFIG_HOME already points at ($wanted)"
+    return
+  }
+  if (which pwsh | is-empty) and not $dry_run {
+    log warn "pwsh is not on PATH yet -- open a new shell and re-run `nu install.nu --only appdirs` so Rio sees config edits live"
+    return
+  }
+  # Through .NET rather than the registry directly: SetEnvironmentVariable also
+  # tells Explorer the environment changed, so a Rio opened from the Start menu
+  # afterwards has it without signing out.
+  let script = $"[Environment]::SetEnvironmentVariable\('RIO_CONFIG_HOME', '($wanted | str replace --all "'" "''")', 'User')"
+  log shell ["pwsh" "-NoProfile" "-NonInteractive" "-Command" $script] --dry-run=$dry_run
+}
+
 export def install [
   system: record
   --root: path
@@ -177,5 +212,9 @@ export def install [
     if ($root | path join $from | path type) != "file" {
       links prune (links stale --root $root --home $dest_root --from $from --managed ($plan | get target)) --dry-run=$dry_run
     }
+  }
+
+  if $system.family == "windows" and not $copy and ("rio" in ($wanted | get app)) {
+    point-rio-at-repo $root --dry-run=$dry_run
   }
 }

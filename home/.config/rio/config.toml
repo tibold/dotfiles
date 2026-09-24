@@ -7,8 +7,9 @@
 # Windows reads %LOCALAPPDATA%\rio; see steps/appdirs.nu.
 #
 # Rio reloads this file when something changes in the directory it reads from.
-# On Windows that directory holds only a link to this file, so editing it here
-# changes nothing Rio is watching: restart Rio to see an edit.
+# On Windows a link in that directory would not do -- editing the file here
+# changes nothing Rio is watching -- so steps/appdirs.nu points RIO_CONFIG_HOME
+# at this directory instead, and edits reload a running Rio there too.
 
 # macOS sends neither Alt nor Meta for Option, so Alt bindings do nothing --
 # dirhistory's Alt+arrows, zsh's Alt+b and Alt+f. 'both' rather than 'left',

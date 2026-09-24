@@ -462,6 +462,19 @@ export def "the pwsh profile loads machine-local settings last" [] {
 }
 
 @test
+export def "the pwsh profile loads the Rio shell integration after the prompt it wraps" [] {
+  # rio.ps1 wraps whatever prompt function exists when it loads. Loaded before
+  # oh-my-posh, oh-my-posh would replace the wrapper and OSC 7 would never be
+  # sent.
+  let rc = (open --raw ($REPO | path join "platform" "windows" ".config" "powershell" "profile.ps1") | lines)
+  let posh = ($rc | enumerate | where {|l| $l.item =~ '^\s*oh-my-posh init' } | get index)
+  let rio = ($rc | enumerate | where {|l| $l.item =~ '^\s*if \(Test-Path \$rioScript\)' } | get index)
+  assert ($posh | is-not-empty) "the profile no longer initialises oh-my-posh"
+  assert ($rio | is-not-empty) "the profile no longer loads Rio's shell integration"
+  assert (($rio | first) > ($posh | first)) "Rio's shell integration loads before oh-my-posh defines the prompt it wraps"
+}
+
+@test
 export def "psql reaches PATH only where it is installed" [] {
   # Both are keg- or installer-local, so a shell config puts them on PATH --
   # guarded, because most machines never install them.

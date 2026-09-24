@@ -117,3 +117,13 @@ export def "a file source plans to just that one file" [] {
 
   cleanup $f
 }
+
+@test
+export def "Rio on Windows is pointed at the config this repo keeps" [] {
+  # RIO_CONFIG_HOME names a directory, and Rio reads config.toml inside it, so
+  # the directory must be the one holding the real file for its watch to see
+  # edits.
+  let dir = (appdirs rio-config-home $REPO)
+  assert ($dir | path join "config.toml" | path exists) $"($dir) holds no config.toml for Rio to read"
+  assert equal ($dir | path basename) "rio"
+}

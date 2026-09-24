@@ -50,6 +50,18 @@ if (Get-Command oh-my-posh -ErrorAction SilentlyContinue) {
     oh-my-posh init pwsh --config (Join-Path $HOME '.config/oh-my-posh/archpillar-cyberpunk.omp.toml') | Invoke-Expression
 }
 
+# Rio's own shell integration, which reports the working directory with OSC 7
+# at every prompt. Rio injects it by itself only into a bare pwsh, one it
+# starts with no arguments, and Rio's config starts this one with some; Rio
+# still names the script's directory in RIO_SHELL_INTEGRATION in every pane,
+# so any shell can load it. After oh-my-posh, because it wraps the prompt
+# function oh-my-posh defines. Rio uses the directory to resolve the relative
+# paths a hint opens; on Windows it does not yet use it for new tabs.
+if ($env:RIO_SHELL_INTEGRATION) {
+    $rioScript = Join-Path $env:RIO_SHELL_INTEGRATION 'powershell/rio.ps1'
+    if (Test-Path $rioScript) { . $rioScript }
+}
+
 # pwsh draws directories on a blue background bar by default, which no palette
 # makes readable. Coloured text instead, from the terminal's own ANSI slots so
 # it follows whatever palette Rio carries. $PSStyle is pwsh 7.2 and later.
