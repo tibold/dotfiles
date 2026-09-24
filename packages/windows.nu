@@ -34,6 +34,7 @@ export const OVERRIDES = {
   gitleaks: "Gitleaks.Gitleaks"
   ripgrep: "BurntSushi.ripgrep.MSVC"
   fzf: "junegunn.fzf"
+  zoxide: "ajeetdsouza.zoxide"
   jq: "jqlang.jq"
   # Node through fnm, which is how this machine already works: the profile runs
   # `fnm env --use-on-cd`. steps/packages.nu installs an LTS default if fnm has

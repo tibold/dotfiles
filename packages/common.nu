@@ -43,6 +43,10 @@ export const PACKAGES = [
   ripgrep
   fzf
   jq
+  # `z <part of a name>` jumps to the directory you use most that matches,
+  # ranked by how often and how recently; `zi` picks among them through fzf.
+  # One binary on every platform, hooked into zsh and pwsh by their configs.
+  zoxide
 
   # The fuller terminfo database. tmux names an entry (tmux-256color) that the
   # minimal database does not carry, and a missing entry stops every login

@@ -143,7 +143,7 @@ plugins=(
   sudo                # Press Esc twice to prepend sudo
 
   # -- Navigation --
-  z          # Jump to frequent directories (z myproject)
+  zoxide     # z myproject: jump to frequent directories (zi to pick with fzf)
   dirhistory # Alt+arrows to navigate directory history
 
   # -- Development --

@@ -50,6 +50,12 @@ if (Get-Command oh-my-posh -ErrorAction SilentlyContinue) {
     oh-my-posh init pwsh --config (Join-Path $HOME '.config/oh-my-posh/archpillar-cyberpunk.omp.toml') | Invoke-Expression
 }
 
+# z and zi, as in zsh: jump to the directory you use most that matches. After
+# oh-my-posh, like everything else that hooks the prompt.
+if (Get-Command zoxide -ErrorAction SilentlyContinue) {
+    zoxide init powershell | Out-String | Invoke-Expression
+}
+
 # Rio's own shell integration, which reports the working directory with OSC 7
 # at every prompt. Rio injects it by itself only into a bare pwsh, one it
 # starts with no arguments, and Rio's config starts this one with some; Rio
