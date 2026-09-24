@@ -286,6 +286,19 @@ def install-shortcut [pwsh: string, dir: path, --dry-run]: nothing -> nothing {
   log shell [$pwsh "-NoProfile" "-NonInteractive" "-Command" $script] --dry-run=$dry_run
 }
 
+# Rio turns OSC 9 and OSC 777 into Windows toasts, sent as the app ID "Rio".
+# Windows drops a toast from an app ID it does not know, without a word -- the
+# call succeeds and nothing appears -- and nothing registers this one: the MSI
+# never did, and a shortcut only would if it carried the ID. The per-user
+# registration is one key with a display name, and needs no administrator.
+const TOAST_KEY = 'HKCU\Software\Classes\AppUserModelId\Rio'
+
+def register-toasts [--dry-run]: nothing -> nothing {
+  let known = (try { registry query --hkcu 'Software\Classes\AppUserModelId\Rio' DisplayName | get value } catch { "" })
+  if $known == "Rio" { log skipped "Rio's notifications are already registered"; return }
+  log shell ["reg" "add" $TOAST_KEY "/v" "DisplayName" "/t" "REG_SZ" "/d" "Rio" "/f"] --dry-run=$dry_run
+}
+
 export def install [--dry-run]: nothing -> nothing {
   log step "Rio, for this user, from its GitHub release, with ConPTY beside it"
 
@@ -314,6 +327,11 @@ export def install [--dry-run]: nothing -> nothing {
     install-shortcut $pwsh $dir --dry-run=$dry_run
   } catch {|e|
     log warn $"the Start menu shortcut was not created: ($e.msg)"
+  }
+  try {
+    register-toasts --dry-run=$dry_run
+  } catch {|e|
+    log warn $"Rio's notifications were not registered: ($e.msg) -- OSC 9 will show nothing"
   }
 
   # Not removed from here: uninstalling it needs the administrator this exists

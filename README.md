@@ -507,7 +507,9 @@ installed unchecked: `rio.exe` must match the release's `checksums.txt`, and
 the ConPTY files must carry a valid Microsoft signature. A running Rio does not
 block an upgrade -- Windows will rename a file that is in use, though not
 delete it, so the old copy steps aside and a later run removes it. Rio is not
-put on PATH; the Start menu is how it is opened.
+put on PATH; the Start menu is how it is opened. It also registers the app ID
+Rio sends its notifications as (OSC 9 and OSC 777 become Windows toasts):
+Windows silently drops a toast from an app ID it does not know.
 
 As on macOS, some tools are already there -- `curl` and `tar` (both ship with
 Windows), `git-credential-manager` (bundled with Git for Windows), `npm`
