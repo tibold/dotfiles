@@ -75,10 +75,13 @@ export const FONTS = {
 }
 
 # Windows-only tools with no logical name elsewhere.
+#
+# Rio, the terminal, is not among them: winget only has its per-machine MSI,
+# which needs an administrator and lacks the ConPTY that images need.
+# lib/rio.nu installs it for this user instead, from the packages step.
 export const EXTRA = [
   "Microsoft.PowerShell"      # pwsh 7, the interactive shell here
   "JanDeDobbeleer.OhMyPosh"   # the prompt, and the font installer above
-  "raphamorim.rio"            # the terminal
   "marlocarlo.psnet"          # the rest of the psmux family
   "marlocarlo.tmuxpanel"      # tmuxpanel, tmuxplugins, tmuxthemes
 ]

@@ -4,6 +4,7 @@ use ../lib/log.nu
 use ../lib/distro.nu
 use ../lib/packages.nu
 use ../lib/fallback.nu
+use ../lib/rio.nu
 
 # Which winget ids still need installing, given what `winget list` already
 # found. Pure and separate from install-windows below so the skip/install
@@ -51,6 +52,11 @@ export def install [
   # below, which assumes exactly one of those things.
   if $distro.family == "windows" {
     install-windows $plan --dry-run=$dry_run
+    # Not a winget package: see lib/rio.nu for why, and why it needs no
+    # administrator. Part of the base list only, like EXTRA.
+    if $group == "base" {
+      try { rio install --dry-run=$dry_run } catch {|e| log warn $"Rio did not install: ($e.msg) -- carrying on; re-run to retry" }
+    }
     return
   }
 

@@ -493,6 +493,22 @@ names, because Nerd Fonts renames what it patches. Installed for the same
 reason macOS installs its cask: the terminal is on this machine, not something
 reached over ssh, so the font belongs here.
 
+Rio, the terminal, is the one application that does not come from winget.
+winget only has its per-machine MSI, which needs an administrator for every
+install and upgrade, and which lacks what images need: Rio talks to its shell
+through ConPTY, and the copy built into Windows predates image passthrough
+(ConPTY 1.22), so Sixel, iTerm2 and Kitty images -- nvim's snacks.image among
+them -- never arrive. `lib/rio.nu` instead puts the `rio.exe` Rio's release
+publishes on its own into `%LOCALAPPDATA%\Programs\Rio`, with `conpty.dll` and
+`OpenConsole.exe` from Microsoft's `Microsoft.Windows.Console.ConPTY` NuGet
+package beside it, and a Start menu shortcut for this user. Every run of the
+packages step brings both up to their latest stable release. Nothing is
+installed unchecked: `rio.exe` must match the release's `checksums.txt`, and
+the ConPTY files must carry a valid Microsoft signature. A running Rio does not
+block an upgrade -- Windows will rename a file that is in use, though not
+delete it, so the old copy steps aside and a later run removes it. Rio is not
+put on PATH; the Start menu is how it is opened.
+
 As on macOS, some tools are already there -- `curl` and `tar` (both ship with
 Windows), `git-credential-manager` (bundled with Git for Windows), `npm`
 (comes with the node fnm installs), the nushell plugins (`nu_plugin_*.exe`
