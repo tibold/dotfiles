@@ -285,6 +285,15 @@ unsetopt beep notify
 
 # End of lines configured by zsh-newuser-install
 
+# Rust and .NET, when their opt-in steps installed them; see ~/.profile.
+if [ -d "$HOME/.cargo/bin" ]; then
+  export PATH="$HOME/.cargo/bin:$PATH"
+fi
+if [ -x "$HOME/.dotnet/dotnet" ]; then
+  export DOTNET_ROOT="$HOME/.dotnet"
+  export PATH="$DOTNET_ROOT:$DOTNET_ROOT/tools:$PATH"
+fi
+
 # See the note in ~/.profile; zsh does not read it for interactive shells.
 export PATH="$HOME/.local/bin:$PATH"
 

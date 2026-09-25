@@ -26,6 +26,18 @@ elif [ -x /usr/local/bin/brew ]; then
   eval "$(/usr/local/bin/brew shellenv)"
 fi
 
+# The opt-in language SDKs (steps/rust.nu, steps/dotnet.nu), each only where
+# it has been installed. Before ~/.local/bin below, which stays first. The .NET
+# SDK lives in ~/.dotnet everywhere but Windows, and its apphosts -- dotnet
+# global tools among them -- find the runtime through DOTNET_ROOT.
+if [ -d "$HOME/.cargo/bin" ]; then
+  export PATH="$HOME/.cargo/bin:$PATH"
+fi
+if [ -x "$HOME/.dotnet/dotnet" ]; then
+  export DOTNET_ROOT="$HOME/.dotnet"
+  export PATH="$DOTNET_ROOT:$DOTNET_ROOT/tools:$PATH"
+fi
+
 # ~/.local/bin holds pipx shims, the Claude CLI, and any tool this repo had to
 # fetch from an upstream release because the distro does not package it
 # (see lib/fallback.nu). Prepended, not appended, so those win over an older

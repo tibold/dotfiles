@@ -62,8 +62,8 @@ lib/              system detection, package resolution, linking, the
                   in apply.
 steps/            The parts of an install: packages, nushell plugins,
                   cleanup, links, app config dirs, zsh, the pwsh profile
-                  (Windows), Claude Code (opt-in), neovim, git hooks, macOS
-                  defaults.
+                  (Windows), Claude Code, the .NET SDK and Rust (all three
+                  opt-in), neovim, git hooks, macOS defaults.
 tools/            Standalone utilities, not run by the installer. These are
                   Linux-only; they configure GDM, KVM, WireGuard and RKE2.
 githooks/         Enabled via core.hooksPath; currently a gitleaks scan.
@@ -83,6 +83,7 @@ nu install.nu --only macos          # just the macOS system defaults
 nu install.nu --with claude         # everything, plus the opt-in Claude Code step
 nu install.nu --only claude         # just Claude Code
 nu install.nu --with databases      # everything, plus psql and sqlite3
+nu install.nu --with dotnet,rust    # everything, plus the .NET and Rust SDKs
 nu install.nu --only powershell     # just the pwsh profile stub (Windows only)
 ```
 
@@ -183,6 +184,37 @@ Two platforms need more than a package name:
   installer. `WINGET_ARGS` in `packages/windows.nu` tells it to leave out the
   server, pgAdmin and StackBuilder -- no Windows service is installed -- and
   the pwsh profile puts the newest `Program Files\PostgreSQL\*\bin` on PATH.
+
+## .NET and Rust
+
+Both SDKs are large and only matter on a machine that is developed on, so they
+are opt-in, separately:
+
+```sh
+nu install.nu --with dotnet,rust    # everything, plus both
+nu install.nu --only dotnet         # just the .NET SDKs
+nu install.nu --only rust           # just Rust
+```
+
+**.NET** installs the newest LTS and the newest release, which is one SDK
+whenever those are the same major. Which majors that means is read from
+Microsoft's release index on each run, so a new release arrives by re-running
+the step; previews and release candidates are never picked. On Windows each
+major is winget's `Microsoft.DotNet.SDK.<major>`. Everywhere else it is
+Microsoft's `dotnet-install.sh` into `~/.dotnet` -- one method for every
+distribution, with no Microsoft package repository to add -- and `.profile`
+and `.zshrc` set `DOTNET_ROOT` and put it and `~/.dotnet/tools` on PATH.
+Re-running picks up the newest patch.
+
+**Rust** is rustup's stable toolchain with rust-analyzer, rust-src, clippy and
+rustfmt. rustup comes from winget on Windows and from the official installer
+elsewhere, told not to edit the shell profiles -- `.profile` and `.zshrc`
+already put `~/.cargo/bin` on PATH. Re-running updates stable; an existing
+default toolchain (nightly, say) is left as it is. The linker is gcc from the
+packages step on Linux and the Command Line Tools on macOS. Windows needs
+MSVC's: if no Visual Studio with the C++ tools is found (asked of `vswhere`,
+so any edition counts), the step installs the Visual Studio Build Tools with
+the C++ workload -- several GB, and it asks for elevation.
 
 ## Nushell plugins
 

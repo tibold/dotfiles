@@ -7,6 +7,7 @@
 #   nu install.nu --only links        just one part
 #   nu install.nu --only packages,links
 #   nu install.nu --with claude       everything, plus an opt-in step
+#   nu install.nu --with dotnet,rust  ... or several
 #   nu install.nu --copy              copy files instead of symlinking them
 #
 # Run bootstrap.sh first on a machine that does not have nushell yet; it
@@ -27,6 +28,8 @@ use steps/macos.nu
 use steps/appdirs.nu
 use steps/powershell.nu
 use steps/claude.nu
+use steps/dotnet.nu
+use steps/rust.nu
 
 # home/, then whichever platform/ directories match this machine.
 #
@@ -73,7 +76,7 @@ def link-everything [
 
 def --env main [
   --only: string = ""     # comma-separated subset of the steps to run
-  --with: string = ""     # comma-separated opt-in steps to add, e.g. claude
+  --with: string = ""     # comma-separated opt-in steps to add, e.g. claude,dotnet,rust
   --copy                  # copy files into place instead of symlinking them
   --dry-run               # print what would be done without doing it
   --home: path            # destination root; defaults to this user's home
@@ -141,6 +144,8 @@ def --env main [
       "macos" => (macos install --home $target --dry-run=$dry_run)
       "powershell" => (powershell install --home $target --dry-run=$dry_run)
       "claude" => (claude install $system.family --dry-run=$dry_run)
+      "dotnet" => (dotnet install $system.family --dry-run=$dry_run)
+      "rust" => (rust install $system.family --dry-run=$dry_run)
       "databases" => (packages install $system --bin-dir $bin_dir --group databases --dry-run=$dry_run)
       # An unknown step name should never reach here (steps requested validates
       # against lib/steps.nu's ORDER and OPT_IN), but fail loudly if it does.
