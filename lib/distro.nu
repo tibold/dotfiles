@@ -239,9 +239,10 @@ export def cask-install-command [family: string, casks: list<string>]: nothing -
     #
     # Deliberately not --force, which is the other way out of the same message:
     # it overwrites whatever is there. Nothing else in this repo destroys a file
-    # it did not create -- that is what ~/.dotfiles-backup exists for -- and a
-    # font that is *not* identical is a font someone chose, so it should stop
-    # and say so.
+    # it did not create -- that is what ~/.dotfiles-backup exists for. A font
+    # that is *not* identical (typically an older Nerd Fonts release installed
+    # by hand) makes this fail, and steps/packages.nu then moves the clashing
+    # files into ~/.dotfiles-backup and tries once more.
     "macos" => (["brew" "install" "--cask" "--adopt"] ++ $casks)
     _ => { error make { msg: $"casks are a Homebrew concept -- family '($family)' has none, so this list should be empty" } }
   }

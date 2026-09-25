@@ -3,7 +3,7 @@ use ../../lib/fallback.nu
 use ../../packages/common.nu
 # By name, not `use ... as steps`: the module name `packages` is already taken
 # by lib/packages.nu above, and steps/packages.nu would shadow it.
-use ../../steps/packages.nu [winget-plan font-present fnm-setup winget-command]
+use ../../steps/packages.nu [winget-plan font-present font-clashes fnm-setup winget-command]
 use std/testing *
 use std/assert
 
@@ -307,6 +307,25 @@ export def "a Meslo nerd font already installed is recognised" [] {
   assert (font-present "meslo" ["C:/Users/u/AppData/Local/Microsoft/Windows/Fonts/MesloLGSNerdFontMono-Regular.ttf"])
   assert not (font-present "meslo" ["C:/Windows/Fonts/Meslo-Plain.ttf"]) "not a nerd font"
   assert not (font-present "meslo" [])
+}
+
+@test
+export def "only fonts an uninstalled cask would overwrite clash" [] {
+  let casks = [
+    { token: "font-sauce-code-pro-nerd-font", installed: null, artifacts: [
+      { font: ["SauceCodeProNerdFont-Regular.ttf"] }
+      { font: ["SauceCodeProNerdFont-Bold.ttf"] }
+    ] }
+    { token: "font-meslo-lg-nerd-font", installed: "3.5.1", artifacts: [{ font: ["MesloLGSNerdFont-Regular.ttf"] }] }
+    { token: "git-credential-manager", installed: "2.9.1", artifacts: [{ pkg: ["gcm.pkg"] } { uninstall: [{}] }] }
+  ]
+  let existing = [
+    "/Users/u/Library/Fonts/SauceCodeProNerdFont-Regular.ttf"
+    "/Users/u/Library/Fonts/MesloLGSNerdFont-Regular.ttf"
+    "/Users/u/Library/Fonts/Other.ttf"
+  ]
+  assert equal (font-clashes $casks $existing) ["SauceCodeProNerdFont-Regular.ttf"] "an installed cask owns its files, and a file not already there cannot clash"
+  assert equal (font-clashes $casks []) []
 }
 
 @test

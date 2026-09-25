@@ -21,6 +21,39 @@ export def font-present [name: string, files: list<string>]: nothing -> bool {
   $files | any {|f| ($f | path basename) =~ $"\(?i\)^($name).*nerd.?font" }
 }
 
+# Which of these font files would a cask install on top of. `casks` is the
+# `.casks` list of `brew info --cask --json=v2`: a cask that is already
+# installed owns its files, so only the others can clash. Each font artifact
+# is a one-item list naming the file, possibly by a path inside the archive.
+# Pure and separate from set-aside-font-clashes so it can be tested without
+# Homebrew.
+export def font-clashes [casks: list, existing: list<string>]: nothing -> list<string> {
+  let present = ($existing | path basename)
+  $casks
+  | where installed == null
+  | each {|cask| $cask.artifacts | where {|a| "font" in $a } | each {|a| $a.font | first | path basename } }
+  | flatten
+  | where {|f| $f in $present }
+  | uniq
+}
+
+# Move the files that stop these casks from installing into
+# ~/.dotfiles-backup/<stamp>/fonts. Returns { dir, count }, or null when
+# nothing clashed -- in which case the install failed for some other reason
+# and there is nothing here to retry.
+def set-aside-font-clashes [casks: list<string>]: nothing -> any {
+  let fonts = ($env.HOME | path join "Library" "Fonts")
+  if not ($fonts | path exists) { return null }
+  let info = (try { ^brew info --cask --json=v2 ...$casks | from json | get casks } catch { return null })
+  let clashes = (font-clashes $info (ls $fonts | get name))
+  if ($clashes | is-empty) { return null }
+  let stamp = (date now | format date "%Y%m%d-%H%M%S")
+  let dir = ($env.HOME | path join ".dotfiles-backup" $stamp "fonts")
+  mkdir $dir
+  for f in $clashes { mv ($fonts | path join $f) ($dir | path join $f) }
+  { dir: $dir, count: ($clashes | length) }
+}
+
 # fnm needs a default Node version before `fnm exec` has anything to run.
 # Installing one is idempotent in principle, but not worth doing every run --
 # `fnm default` already says whether one exists.
@@ -78,10 +111,22 @@ export def install [
   # shell configured because a glyph set could not be replaced.
   if ($plan.casks | is-not-empty) {
     log step $"Casks \(($plan.casks | str join ', '))"
+    let command = (distro cask-install-command $distro.family $plan.casks)
+    let failed = $"could not install ($plan.casks | str join ', ') -- carrying on without it; the status line separators need a Nerd Font in the terminal, so install it by hand if this keeps failing"
     try {
-      log shell (distro cask-install-command $distro.family $plan.casks) --dry-run=$dry_run
+      log shell $command --dry-run=$dry_run
     } catch {
-      log warn $"could not install ($plan.casks | str join ', ') -- carrying on without it; the status line separators need a Nerd Font in the terminal, so install it by hand if this keeps failing"
+      # The usual cause is a hand-installed copy of a different Nerd Fonts
+      # release: same file names, different bytes, which --adopt will not take
+      # over. Those files go to ~/.dotfiles-backup, like any other file this
+      # repo needs the place of, and the install gets one more try.
+      let saved = (set-aside-font-clashes $plan.casks)
+      if ($saved | is-empty) {
+        log warn $failed
+      } else {
+        log warn $"($saved.count) font files differed from the cask's; saved to ($saved.dir)"
+        try { log shell $command } catch { log warn $failed }
+      }
     }
   }
 
