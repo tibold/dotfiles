@@ -16,6 +16,12 @@ export const OVERRIDES = {
   mkisofs: "xorriso"
   neovim-python: "python3-neovim"
 
+  # The C library's headers and startup files (crti.o, -lc). gcc only
+  # *recommends* them, and this overlay installs with --no-install-recommends,
+  # so without this "gcc" is a compiler that cannot link a program -- which
+  # cargo, and anything else that shells out to cc, found out first.
+  gcc: ["gcc" "libc6-dev"]
+
   nerd-fonts: null
 
   # gh needs GitHub's own apt repo; the rest are not packaged at all. They all

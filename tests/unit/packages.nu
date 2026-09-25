@@ -499,3 +499,12 @@ export def "the Windows PostgreSQL install leaves out the server" [] {
   # And an id with no extra arguments is the plain command.
   assert not ((winget-command "SQLite.SQLite" $r.winget_args | str join " ") | str contains "--override")
 }
+
+@test
+export def "gcc on Debian can link, not just compile" [] {
+  # apt runs with --no-install-recommends, which leaves out libc6-dev -- the
+  # startup files and -lc every link needs.
+  let resolved = (packages resolve $UBUNTU)
+  assert ("gcc" in $resolved.install)
+  assert ("libc6-dev" in $resolved.install)
+}
