@@ -125,6 +125,7 @@ def "main configure server" [
     # not a certificate regeneration across every node
     "tls-san": [$api_vip "api.lab" $"($name).lab"]
     "node-taint": ["CriticalAddonsOnly=true:NoExecute"]
+    "kube-proxy-arg": ["proxy-mode=nftables"]
     selinux: true
   }
   | merge (if ($token | is-empty) { {} } else { {token: $token} })
