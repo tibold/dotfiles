@@ -14,6 +14,9 @@ export const OVERRIDES = {
   postgresql-client: "postgresql"
   sqlite: "sqlite3"
 
+  # -- Kubernetes tools (packages/common.nu K8S_TOOLS) --
+  # A metapackage that pulls in the current kubernetesX.YY-client.
+  kubectl: "kubernetes-client"
 
   # Not packaged by any distribution. Comes from the upstream release instead,
   # which is a self-contained build needing no dotnet -- see lib/fallback.nu.

@@ -21,6 +21,11 @@ export const OVERRIDES = {
   postgresql-client: "PostgreSQL.PostgreSQL.18"
   sqlite: "SQLite.SQLite"
 
+  # -- Kubernetes tools (packages/common.nu K8S_TOOLS) --
+  kubectl: "Kubernetes.kubectl"
+  helm: "Helm.Helm"
+  k9s: "Derailed.k9s"
+
   tmux: "marlocarlo.psmux"
   htop: "marlocarlo.pstop"
   # The C compiler nvim-treesitter's parser builds find. Not gcc, but gcc is

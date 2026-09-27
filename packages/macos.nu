@@ -26,6 +26,9 @@ export const OVERRIDES = {
   postgresql-client: "libpq"
   sqlite: null
 
+  # -- Kubernetes tools (packages/common.nu K8S_TOOLS) --
+  kubectl: "kubernetes-cli"
+
   nodejs: "node"
 
   # Same as Fedora and Debian: cdrtools is not packaged, xorriso does the job

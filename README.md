@@ -62,8 +62,9 @@ lib/              system detection, package resolution, linking, the
                   in apply.
 steps/            The parts of an install: packages, nushell plugins,
                   cleanup, links, app config dirs, zsh, the pwsh profile
-                  (Windows), Claude Code, the .NET SDK and Rust (all three
-                  opt-in), neovim, git hooks, macOS defaults.
+                  (Windows), Claude Code, the Kubernetes tools, the .NET SDK
+                  and Rust (all four opt-in), neovim, git hooks, macOS
+                  defaults.
 tools/            Standalone utilities, not run by the installer. These are
                   Linux-only; they configure GDM, KVM, WireGuard and RKE2.
 githooks/         Enabled via core.hooksPath; currently a gitleaks scan.
@@ -84,6 +85,7 @@ nu install.nu --with claude         # everything, plus the opt-in Claude Code st
 nu install.nu --only claude         # just Claude Code
 nu install.nu --with databases      # everything, plus psql and sqlite3
 nu install.nu --with dotnet,rust    # everything, plus the .NET and Rust SDKs
+nu install.nu --with k8s-tools      # everything, plus kubectl, helm, k9s and plugins
 nu install.nu --only powershell     # just the pwsh profile stub (Windows only)
 ```
 
@@ -184,6 +186,42 @@ Two platforms need more than a package name:
   installer. `WINGET_ARGS` in `packages/windows.nu` tells it to leave out the
   server, pgAdmin and StackBuilder -- no Windows service is installed -- and
   the pwsh profile puts the newest `Program Files\PostgreSQL\*\bin` on PATH.
+
+## Kubernetes tools
+
+kubectl, helm and k9s, plus kubectl plugins through krew, for machines that
+talk to a cluster -- which most do not, so they are opt-in:
+
+```sh
+nu install.nu --with k8s-tools      # everything, plus the Kubernetes tools
+nu install.nu --only k8s-tools      # just them
+```
+
+The three clients are `K8S_TOOLS` in `packages/common.nu`, mapped by each
+overlay like the database clients. Fedora, Tumbleweed, Homebrew and winget
+package all three (`kubernetes-client` on the Linux ones, `kubernetes-cli` in
+Homebrew). Leap has only helm, and Ubuntu none of them, so the rest come from
+upstream through `lib/fallback.nu`: k9s from its GitHub release, helm from
+get.helm.sh, and kubectl as the bare binary from dl.k8s.io.
+
+The plugins come from krew, kubectl's plugin manager, since only Tumbleweed
+packages any of them. No platform packages krew in a way that helps, so the
+step fetches its release and lets it install itself into `~/.krew`. `.profile`,
+`.zshrc` and the pwsh profile put `~/.krew/bin` on PATH, which is where kubectl
+looks for `kubectl-<name>`. The plugins are `PLUGINS` in `steps/k8s.nu`:
+
+- **cnpg** -- CloudNativePG: `kubectl cnpg status`, `promote`, `psql`, backups;
+- **ctx** and **ns** -- kubectx and kubens: switch context or namespace, and
+  with no argument pick one through fzf;
+- **stern** -- tail the logs of every pod matching a pattern, one colour each.
+
+Re-running updates krew's index, installs whatever is missing and upgrades
+these plugins and krew itself. Plugins you add with `kubectl krew install` are
+left alone.
+
+On **Windows**, krew has no build of ctx or ns, so winget installs them
+instead. Their winget packages insist on their own names, so there they are
+`kubectx` and `kubens`, not `kubectl ctx` and `kubectl ns`.
 
 ## .NET and Rust
 

@@ -102,6 +102,17 @@ export const DATABASES = [
   sqlite              # sqlite3
 ]
 
+# Kubernetes clients, installed only with `nu install.nu --with k8s-tools`.
+#
+# Kept out of PACKAGES for the same reason as DATABASES: most machines never
+# talk to a cluster. The kubectl plugins are not here -- steps/k8s.nu installs
+# them through krew, which no distribution packages, the same way everywhere.
+export const K8S_TOOLS = [
+  kubectl
+  helm
+  k9s
+]
+
 # Installed through pipx rather than the distro, because the distro versions
 # lag and these are pure-python leaf tools with no system integration.
 export const PIPX = [

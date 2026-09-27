@@ -30,6 +30,7 @@ use steps/powershell.nu
 use steps/claude.nu
 use steps/dotnet.nu
 use steps/rust.nu
+use steps/k8s.nu
 
 # home/, then whichever platform/ directories match this machine.
 #
@@ -76,7 +77,7 @@ def link-everything [
 
 def --env main [
   --only: string = ""     # comma-separated subset of the steps to run
-  --with: string = ""     # comma-separated opt-in steps to add, e.g. claude,dotnet,rust
+  --with: string = ""     # comma-separated opt-in steps to add, e.g. claude,dotnet,rust,k8s-tools
   --copy                  # copy files into place instead of symlinking them
   --dry-run               # print what would be done without doing it
   --home: path            # destination root; defaults to this user's home
@@ -147,6 +148,7 @@ def --env main [
       "dotnet" => (dotnet install $system.family --dry-run=$dry_run)
       "rust" => (rust install $system.family --dry-run=$dry_run)
       "databases" => (packages install $system --bin-dir $bin_dir --group databases --dry-run=$dry_run)
+      "k8s-tools" => (k8s install $system --bin-dir $bin_dir --dry-run=$dry_run)
       # An unknown step name should never reach here (steps requested validates
       # against lib/steps.nu's ORDER and OPT_IN), but fail loudly if it does.
       _ => { error make { msg: $"install.nu has no dispatch arm for step '($step)' -- add one" } }

@@ -25,6 +25,14 @@ if ($pgBin -and -not ($env:PATH -split ';' | Where-Object { (& $spell $_) -eq (&
     $env:PATH = "$($pgBin.FullName);$env:PATH"
 }
 
+# kubectl plugins, from `nu install.nu --with k8s-tools`. krew keeps them in its
+# own bin directory and changes no PATH itself; kubectl finds a plugin by
+# looking for kubectl-<name> on PATH.
+$krewBin = Join-Path ($env:KREW_ROOT ?? (Join-Path $HOME '.krew')) 'bin'
+if ((Test-Path $krewBin) -and -not ($env:PATH -split ';' | Where-Object { (& $spell $_) -eq (& $spell $krewBin) })) {
+    $env:PATH = "$krewBin;$env:PATH"
+}
+
 Set-Alias -Name k -Value kubectl
 Set-Alias -Name tf -Value terraform
 Set-Alias -Name vim -Value nvim

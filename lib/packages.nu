@@ -92,16 +92,18 @@ def expand [value: any]: nothing -> list<any> {
 # having anything to do with it. Calling that "omitted" would tell a reader the
 # environment lacks a tool that is on their PATH.
 #
-# `--group databases` resolves the opt-in DATABASES list instead, through the
-# same overlays and the same accounting, but without the base list's
-# companions: no EXTRA, no pipx or npm, nothing to remove.
+# `--group databases` and `--group k8s-tools` resolve the opt-in DATABASES and
+# K8S_TOOLS lists instead, through the same overlays and the same accounting,
+# but without the base list's companions: no EXTRA, no pipx or npm, nothing to
+# remove.
 export def resolve [distro: record, --group: string = "base"]: nothing -> record {
   let overlay = (overlay-for $distro)
   let base = ($group == "base")
   let names = (match $group {
     "base" => $common.PACKAGES
     "databases" => $common.DATABASES
-    _ => { error make { msg: $"unknown package group '($group)' -- base or databases" } }
+    "k8s-tools" => $common.K8S_TOOLS
+    _ => { error make { msg: $"unknown package group '($group)' -- base, databases or k8s-tools" } }
   })
 
   let mapped = $names | each {|logical|

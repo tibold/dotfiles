@@ -6,6 +6,10 @@
 # that Leap's shortfalls stay visible in one place rather than being smeared
 # across the shared suse file as conditionals.
 export const OVERRIDES = {
+  # Kubernetes tools (packages/common.nu K8S_TOOLS): Leap has helm, not these.
+  kubectl: null
+  k9s: null
+
   lazygit: null
   git-delta: null
   gitleaks: null

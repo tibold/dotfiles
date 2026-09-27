@@ -72,11 +72,16 @@ export def winget-command [id: string, extra: record]: nothing -> list<string> {
 export def install [
   distro: record
   --bin-dir: path
-  --group: string = "base"   # or "databases", the opt-in step's list
+  --group: string = "base"   # or "databases" or "k8s-tools", an opt-in step's list
   --dry-run
 ]: nothing -> nothing {
   let plan = (packages resolve $distro --group $group)
-  let title = (if $group == "base" { "System packages" } else { "Database clients" })
+  let title = (match $group {
+    "base" => "System packages"
+    "databases" => "Database clients"
+    "k8s-tools" => "Kubernetes tools"
+    _ => $group
+  })
 
   log step $"($title) for ($distro.pretty) \(($plan.install | length) packages)"
 
@@ -93,12 +98,16 @@ export def install [
     return
   }
 
-  let refresh = (distro refresh-command $distro.family)
-  if ($refresh | is-not-empty) {
-    log shell $refresh --dry-run=$dry_run
-  }
+  # Nothing to ask the package manager for happens with an opt-in group: Debian
+  # packages none of the Kubernetes tools, and they all come from upstream.
+  if ($plan.install | is-not-empty) {
+    let refresh = (distro refresh-command $distro.family)
+    if ($refresh | is-not-empty) {
+      log shell $refresh --dry-run=$dry_run
+    }
 
-  log shell (distro install-command $distro.family $plan.install) --dry-run=$dry_run
+    log shell (distro install-command $distro.family $plan.install) --dry-run=$dry_run
+  }
 
   # A separate transaction because casks are installed by a different
   # subcommand, not because they are optional. Only macOS has any.
@@ -201,8 +210,8 @@ def install-windows [plan: record, --dry-run]: nothing -> nothing {
   for present in $plan.provided { log skipped $"($present.tool): in the base system -- ($present.reason)" }
   for skipped in $plan.omitted { log skipped $"($skipped.tool): ($skipped.reason)" }
 
-  # Only the base list carries npm packages; the database group has no use
-  # for Node at all.
+  # Only the base list carries npm packages; the opt-in groups have no use for
+  # Node at all.
   if ($plan.npm | is-empty) { return }
 
   if (which fnm | is-not-empty) or $dry_run {

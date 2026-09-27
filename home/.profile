@@ -37,6 +37,11 @@ if [ -x "$HOME/.dotnet/dotnet" ]; then
   export DOTNET_ROOT="$HOME/.dotnet"
   export PATH="$DOTNET_ROOT:$DOTNET_ROOT/tools:$PATH"
 fi
+# kubectl plugins, which krew (steps/k8s.nu) keeps in its own bin directory;
+# kubectl finds a plugin by looking for kubectl-<name> on PATH.
+if [ -d "${KREW_ROOT:-$HOME/.krew}/bin" ]; then
+  export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+fi
 
 # ~/.local/bin holds pipx shims, the Claude CLI, and any tool this repo had to
 # fetch from an upstream release because the distro does not package it

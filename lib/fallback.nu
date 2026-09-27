@@ -108,6 +108,55 @@ export const SOURCES = {
     binaries: ["git-credential-manager"]
     layout: "directory"
   }
+
+  # -- Kubernetes tools (packages/common.nu K8S_TOOLS), opt-in --
+  #
+  # The version is still read from the GitHub repository's latest release, but
+  # two of the three publish their builds elsewhere, which is what `url` is
+  # for. k9s names its archives without a version at all.
+  k9s: {
+    repo: "derailed/k9s"
+    assets: {
+      x86_64: "k9s_Linux_amd64.tar.gz"
+      aarch64: "k9s_Linux_arm64.tar.gz"
+    }
+    binaries: ["k9s"]
+  }
+  # get.helm.sh, not the GitHub release, which carries only signatures. The
+  # archive names keep the tag's "v".
+  helm: {
+    repo: "helm/helm"
+    url: "https://get.helm.sh/{name}"
+    assets: {
+      x86_64: "helm-{tag}-linux-amd64.tar.gz"
+      aarch64: "helm-{tag}-linux-arm64.tar.gz"
+    }
+    binaries: ["helm"]
+  }
+  # The executable itself, not an archive. The architecture is a directory in
+  # the URL rather than part of the file's name, so the asset names carry it
+  # and the file is saved under the last segment.
+  kubectl: {
+    repo: "kubernetes/kubernetes"
+    url: "https://dl.k8s.io/release/{tag}/bin/linux/{name}"
+    assets: {
+      x86_64: "amd64/kubectl"
+      aarch64: "arm64/kubectl"
+    }
+    binaries: ["kubectl"]
+    layout: "executable"
+  }
+}
+
+# Where a release's files are, unless the source names somewhere else.
+const RELEASE_URL = "https://github.com/{repo}/releases/download/{tag}/{name}"
+
+# Fill in an asset or url template. `{tag}` is the release tag as it is;
+# `{version}` is the tag with any leading "v" removed.
+export def expand-template [template: string, vars: record]: nothing -> string {
+  $vars | transpose key value | reduce --fold $template {|it, acc|
+    $acc | str replace --all $"{($it.key)}" $it.value
+  }
 }
 
 export def arch []: nothing -> string {
@@ -150,15 +199,16 @@ export def resolve-asset [tool: string, --arch: string]: nothing -> record {
   }
 
   let tag = (latest-tag $source.repo)
-  # Tags are inconsistently prefixed; filenames never are.
+  # Tags are inconsistently prefixed; most filenames are not.
   let version = ($tag | str replace --regex '^v' '')
-  let name = ($template | str replace --all "{version}" $version)
+  let name = (expand-template $template { tag: $tag, version: $version })
+  let url = (expand-template ($source.url? | default $RELEASE_URL) { repo: $source.repo, tag: $tag, name: $name })
 
   {
     tool: $tool
     version: $tag
-    name: $name
-    url: $"https://github.com/($source.repo)/releases/download/($tag)/($name)"
+    name: ($name | path basename)
+    url: $url
     binaries: $source.binaries
   }
 }
@@ -170,6 +220,8 @@ export def resolve-asset [tool: string, --arch: string]: nothing -> record {
 #              a licence and a README.
 #   directory  the whole archive is kept together and the binaries are linked
 #              to from bin-dir, because the executable does not work alone.
+#   executable there is no archive: the download is the one binary, and goes
+#              into bin-dir as it is. kubectl is published that way.
 #
 # The distinction is not cosmetic. git-credential-manager's Linux archive is
 # the binary plus libSkiaSharp.so and libHarfBuzzSharp.so, which it loads from
@@ -235,8 +287,8 @@ export def install-directory [
   }
 }
 
-# Fetch one tool into bin-dir. Every source above is a .tar.gz; what happens to
-# its contents afterwards depends on the tool's layout, above.
+# Fetch one tool into bin-dir. Every source above is a .tar.gz but kubectl;
+# what happens to the download depends on the tool's layout, above.
 export def install [
   tool: string
   --bin-dir: path
@@ -275,6 +327,15 @@ export def install [
 
   let asset = (resolve-asset $tool --arch (arch))
   log info $"($tool) ($asset.version) <- ($asset.name)"
+
+  if (layout-of $tool) == "executable" {
+    mkdir $bin_dir
+    let dest = ($bin_dir | path join ($source.binaries | first))
+    http get $asset.url | save --raw --force $dest
+    ^chmod +x $dest
+    log ok $"($source.binaries | first) -> ($dest)"
+    return
+  }
 
   let workdir = (mktemp --directory --tmpdir $"dotfiles-($tool)-XXXXXX")
   let archive = ($workdir | path join $asset.name)

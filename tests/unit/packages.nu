@@ -151,18 +151,31 @@ export def "fallback sources cover both architectures" [] {
 }
 
 @test
-export def "every fallback asset name is templated on the version" [] {
-  # The names are built from the release tag rather than matched against a
+export def "every fallback download is templated on the release" [] {
+  # The URLs are built from the release tag rather than matched against a
   # listing, so a template that forgot its placeholder would silently ask for
-  # the same stale filename forever.
+  # the same stale file forever. GitHub's own release URL carries the tag, so
+  # only a source with a `url` of its own has to say where it goes.
   for tool in ($fallback.SOURCES | columns) {
-    let assets = ($fallback.SOURCES | get $tool | get assets)
-    for arch in ($assets | columns) {
-      let template = ($assets | get $arch)
-      assert ($template | str contains "{version}") $"($tool)/($arch) has no {version} placeholder: ($template)"
-      assert ($template | str ends-with ".tar.gz") $"($tool)/($arch) is not a .tar.gz, which is all the installer unpacks"
+    let source = ($fallback.SOURCES | get $tool)
+    for arch in ($source.assets | columns) {
+      let template = ($source.assets | get $arch)
+      let url = ($source.url? | default "{tag}")
+      let full = ($url | str replace "{name}" $template)
+      assert (($full | str contains "{version}") or ($full | str contains "{tag}")) $"($tool)/($arch) never names the release: ($full)"
+      if (fallback layout-of $tool) != "executable" {
+        assert ($template | str ends-with ".tar.gz") $"($tool)/($arch) is not a .tar.gz, which is all the installer unpacks"
+      }
     }
   }
+}
+
+@test
+export def "a template fills in the tag and the bare version" [] {
+  let vars = { tag: "v4.3.0", version: "4.3.0" }
+  assert equal (fallback expand-template "helm-{tag}-linux-amd64.tar.gz" $vars) "helm-v4.3.0-linux-amd64.tar.gz"
+  assert equal (fallback expand-template "nu-{version}-x86_64.tar.gz" $vars) "nu-4.3.0-x86_64.tar.gz"
+  assert equal (fallback expand-template "k9s_Linux_amd64.tar.gz" $vars) "k9s_Linux_amd64.tar.gz"
 }
 
 # --- macOS --------------------------------------------------------------------
@@ -340,7 +353,7 @@ export def "fnm gets an LTS default only when it has none" [] {
 export def "every source declares a layout the installer understands" [] {
   for tool in ($fallback.SOURCES | columns) {
     let layout = (fallback layout-of $tool)
-    assert ($layout in ["binaries" "directory"]) $"($tool) has layout '($layout)', which lib/fallback.nu cannot install"
+    assert ($layout in ["binaries" "directory" "executable"]) $"($tool) has layout '($layout)', which lib/fallback.nu cannot install"
   }
 }
 
@@ -478,6 +491,35 @@ export def "a database group adds none of the base extras" [] {
   assert equal $r.pipx []
   assert equal $r.npm []
   assert equal $r.fonts []
+}
+
+@test
+export def "every platform accounts for every Kubernetes tool" [] {
+  # Linux may fetch these from upstream, unlike the database clients; macOS
+  # and Windows may not, since lib/fallback.nu only has Linux builds.
+  for d in $ALL {
+    let r = (packages resolve $d --group k8s-tools)
+    let accounted = (($r.install | length) + ($r.fallback | length) + ($r.provided | length) + ($r.omitted | length))
+    assert ($accounted >= ($common.K8S_TOOLS | length)) $"($d.id) resolves fewer Kubernetes tools than it is asked for"
+    for tool in $r.fallback {
+      assert ($tool in ($fallback.SOURCES | columns)) $"($d.id): ($tool) is unavailable and has no entry in fallback.nu"
+    }
+  }
+  assert equal (packages resolve $MACOS --group k8s-tools).fallback []
+  assert equal (packages resolve $WINDOWS --group k8s-tools).fallback []
+}
+
+@test
+export def "Kubernetes tools stay out of a plain install" [] {
+  for d in $ALL {
+    let base = (packages resolve $d)
+    for id in (packages resolve $d --group k8s-tools).install {
+      assert ($id not-in $base.install) $"($id) is installed on ($d.id) without --with k8s-tools"
+    }
+    for tool in $common.K8S_TOOLS {
+      assert ($tool not-in $base.fallback) $"($tool) is fetched on ($d.id) without --with k8s-tools"
+    }
+  }
 }
 
 @test

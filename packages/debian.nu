@@ -7,6 +7,12 @@ export const OVERRIDES = {
   # -- database clients (packages/common.nu DATABASES) --
   sqlite: "sqlite3"
 
+  # -- Kubernetes tools (packages/common.nu K8S_TOOLS) --
+  # None is in the archive; each needs its vendor's apt repo, so all three come
+  # from the upstream release instead.
+  kubectl: null
+  helm: null
+  k9s: null
 
   # Not packaged by any distribution. Comes from the upstream release instead,
   # which is a self-contained build needing no dotnet -- see lib/fallback.nu.

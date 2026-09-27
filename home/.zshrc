@@ -293,6 +293,10 @@ if [ -x "$HOME/.dotnet/dotnet" ]; then
   export DOTNET_ROOT="$HOME/.dotnet"
   export PATH="$DOTNET_ROOT:$DOTNET_ROOT/tools:$PATH"
 fi
+# kubectl plugins, when the k8s-tools step installed krew; see ~/.profile.
+if [ -d "${KREW_ROOT:-$HOME/.krew}/bin" ]; then
+  export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+fi
 
 # See the note in ~/.profile; zsh does not read it for interactive shells.
 export PATH="$HOME/.local/bin:$PATH"

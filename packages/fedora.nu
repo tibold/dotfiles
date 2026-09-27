@@ -4,6 +4,10 @@ export const OVERRIDES = {
   # `postgresql` is the client; the server is postgresql-server.
   postgresql-client: "postgresql"
 
+  # -- Kubernetes tools (packages/common.nu K8S_TOOLS) --
+  # Fedora packages one kubernetesX.YY-client per minor; each provides
+  # kubernetes-client, and dnf resolves that to the newest.
+  kubectl: "kubernetes-client"
 
   # Not packaged by any distribution. Comes from the upstream release instead,
   # which is a self-contained build needing no dotnet -- see lib/fallback.nu.
