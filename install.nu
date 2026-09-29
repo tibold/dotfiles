@@ -144,7 +144,7 @@ def --env main [
       "hooks" => (githooks install --root $root --dry-run=$dry_run)
       "macos" => (macos install --home $target --dry-run=$dry_run)
       "powershell" => (powershell install --home $target --dry-run=$dry_run)
-      "claude" => (claude install $system.family --dry-run=$dry_run)
+      "claude" => (claude install $system.family --home $target --dry-run=$dry_run)
       "dotnet" => (dotnet install $system.family --dry-run=$dry_run)
       "rust" => (rust install $system.family --dry-run=$dry_run)
       "databases" => (packages install $system --bin-dir $bin_dir --group databases --dry-run=$dry_run)

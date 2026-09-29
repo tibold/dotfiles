@@ -13,16 +13,17 @@
 #             %APPDATA% on Windows, not %LOCALAPPDATA%
 #   rio       ~/.config even on macOS, ignoring the convention above, and
 #             %LOCALAPPDATA% on Windows
-#   git       ~/.gitconfig everywhere, Windows included -- the one entry here
-#             that names a file rather than a directory
+#   git       ~/.gitconfig everywhere, Windows included -- an entry that
+#             names a file rather than a directory
 #
 # There is no deriving that. Each project decided separately, and the only
 # honest way to hold it is to write down the ones that deviate.
 #
-# One more entry exists for a different reason: Windows does not mirror
+# Two more entries exist for a different reason: Windows does not mirror
 # home/ at all (see NOT_ON_WINDOWS below), so tmux-themes links the tmux
 # theme files -- which psmux, tmux's Windows replacement, reads as they are
-# -- into their ordinary location purely to get them there.
+# -- into their ordinary location purely to get them there, and claude does
+# the same for the Claude Code status line script.
 #
 # Left as a link rather than moving the file: the copy under ~/.config stays,
 # so a config is always findable where the rest of them are, and the second
@@ -83,6 +84,14 @@ export const PLACES = [
     source: ".gitconfig"
     dirs: { windows: ".gitconfig" }
   }
+  # The script settings.json's statusLine runs; steps/claude.nu writes that
+  # key. The file alone, never ~/.claude itself: Claude Code keeps its
+  # credentials, history and sessions in there.
+  {
+    app: "claude"
+    source: ".claude/statusline-command.sh"
+    dirs: { windows: ".claude/statusline-command.sh" }
+  }
 ]
 
 # home/.config/<app>/ directories that deliberately do not reach Windows, with
@@ -113,7 +122,7 @@ export def plan-for [system: record]: nothing -> table {
 # The links-plan rows for one resolved entry (app/source/dest, as plan-for
 # returns), whether its source is a file or a directory.
 #
-# links plan only knows how to mirror a directory. A file entry (git) is
+# links plan only knows how to mirror a directory. A file entry (git, claude) is
 # planned by mirroring its parent directory instead and keeping the one row
 # for the file itself -- which gives it exactly the same backup/apply/prune
 # treatment a directory entry gets, rather than a special case for it further
@@ -204,7 +213,7 @@ export def install [
     # timestamped directory.
     links apply $plan --copy=$copy --dry-run=$dry_run --backup-root ($home | path join ".dotfiles-backup" $entry.app)
 
-    # Skipped for a file entry (git): dest_root there is the file itself, not
+    # Skipped for a file entry (git, claude): dest_root there is the file itself, not
     # a directory, and stale's scan would instead walk every directory under
     # home/ looking for dangling links that have nothing to do with this
     # entry. Scoped to this application's own directory otherwise, so a stale

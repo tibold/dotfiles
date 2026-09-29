@@ -61,7 +61,7 @@ export def "macOS is where lazygit and nushell need the second link" [] {
 @test
 export def "Windows gets its shared configs from here" [] {
   let win = (appdirs plan-for { id: "windows", family: "windows" })
-  for app in ["lazygit" "rio" "nushell" "tmux-themes" "git"] {
+  for app in ["lazygit" "rio" "nushell" "tmux-themes" "git" "claude"] {
     assert ($app in ($win | get app)) $"($app) has no Windows entry"
   }
   assert equal ($win | where app == "nushell" | first | get dest) "AppData/Roaming/nushell"

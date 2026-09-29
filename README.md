@@ -254,6 +254,29 @@ MSVC's: if no Visual Studio with the C++ tools is found (asked of `vswhere`,
 so any edition counts), the step installs the Visual Studio Build Tools with
 the C++ workload -- several GB, and it asks for elevation.
 
+## Claude Code
+
+Opt-in, as `--with claude` or `--only claude`. The step runs the official
+installer when `claude` is not on PATH -- after that it updates itself -- and
+then sets the status line.
+
+The status line is `home/.claude/statusline-command.sh`: a context-window bar
+stretched to the terminal's width, then the 5-hour and 7-day rate limits with
+the time each resets. It is coloured from the terminal's ANSI palette, so it
+follows the terminal's theme -- in Rio, whose palette is the ArchPillar
+cyberpunk tokens, that is `--accent` mint, `--warning` amber and `--danger`
+red. The bar steps from green to yellow at 50% to red at 80% as it fills, and
+each percentage takes the colour of its own level. It needs `jq`, which the packages step installs, and
+runs under bash everywhere, Windows included. The links step puts it in
+`~/.claude` like any other file in `home/`; on Windows, which does not mirror
+`home/`, a `claude` entry in `steps/appdirs.nu` does.
+
+`~/.claude/settings.json` itself is not linked. Claude Code rewrites it
+whenever a setting changes, and most of it -- plugins, marketplaces with local
+paths, the model -- belongs to the machine rather than to this repo. So the
+step merges in the one key it owns, `statusLine`, and leaves every other key
+as it was; a second run finds it already set and writes nothing.
+
 ## Nushell plugins
 
 `from ini`, `query json` and `inc` are not built into nushell; each is
@@ -329,19 +352,20 @@ nushell   the same split on macOS, for the same reason: both follow the
           platform's own convention; %APPDATA% on Windows, not %LOCALAPPDATA%
 rio       ~/.config even on macOS, ignoring the convention above, and
           %LOCALAPPDATA% on Windows
-git       ~/.gitconfig everywhere, Windows included -- the one entry here
-          that names a file rather than a directory
+git       ~/.gitconfig everywhere, Windows included -- an entry that
+          names a file rather than a directory
 ```
 
 `steps/appdirs.nu` lists the ones that deviate and links the config a second
 time, into the directory that application actually opens. The copy under
 `~/.config` stays, so configs remain findable in one place.
 
-One more entry exists for a different reason: Windows does not mirror `home/`
+Two more entries exist for a different reason: Windows does not mirror `home/`
 at all (see [Windows](#windows)), so a `tmux-themes` entry links
 `~/.config/tmux/themes` back to the same place it already sits, purely to get
 the files onto a Windows machine at all -- `psmux`, tmux's Windows stand-in,
-reads them from there unchanged.
+reads them from there unchanged -- and a `claude` entry does the same for
+`~/.claude/statusline-command.sh` (see [Claude Code](#claude-code)).
 
 Files, never the whole directory: applications keep state next to their config
 -- lazygit writes `github_pull_requests.json` there, nushell its history and
@@ -600,8 +624,8 @@ through [`steps/appdirs.nu`](#applications-that-keep-their-config-elsewhere),
 one named application at a time: lazygit and rio into `%LOCALAPPDATA%`,
 nushell into `%APPDATA%`, the tmux theme files into their ordinary
 `~/.config/tmux/themes` (psmux reads them from there directly), and
-`~/.gitconfig` as the one entry that links a single file rather than a
-directory. `tests/unit/appdirs.nu` fails for any `home/.config/<app>/` that is
+`~/.gitconfig` and `~/.claude/statusline-command.sh` as the entries that link
+a single file rather than a directory. `tests/unit/appdirs.nu` fails for any `home/.config/<app>/` that is
 not in `PLACES` for Windows and not named, with a reason, in `NOT_ON_WINDOWS`
 -- currently just `tmux`, whose own config directory has no Windows reader at
 all, only its themes -- so a new config added under `home/.config/` cannot
