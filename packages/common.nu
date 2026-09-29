@@ -23,10 +23,10 @@ export const PACKAGES = [
   # -- Git tooling --
   gh          # GitHub CLI; doubles as git's credential helper
   lazygit
-  git-delta   # lazygit and .gitconfig both page diffs through it
+  git-delta   # lazygit and the git config both page diffs through it
   gitleaks    # backs the pre-commit secret scan, see githooks/
 
-  # The credential helper .gitconfig names for dev.azure.com. Until it was
+  # The credential helper the git config names for dev.azure.com. Until it was
   # added here, that host's `helper = git-credential-manager` line pointed at
   # nothing on every machine this repo has ever set up.
   #

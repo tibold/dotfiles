@@ -65,7 +65,8 @@ export def "Windows gets its shared configs from here" [] {
     assert ($app in ($win | get app)) $"($app) has no Windows entry"
   }
   assert equal ($win | where app == "nushell" | first | get dest) "AppData/Roaming/nushell"
-  assert equal ($win | where app == "git" | first | get dest) ".gitconfig"
+  # Not ~/.gitconfig, which is this machine's own file; see steps/gitconfig.nu.
+  assert equal ($win | where app == "git" | first | get dest) ".config/git/shared.conf"
 }
 
 @test

@@ -282,7 +282,7 @@ export def "the docker alias checks that docker actually runs" [] {
 
 @test
 export def "every credential helper the gitconfig names is a tool this repo installs" [] {
-  # The check that was missing. .gitconfig has named git-credential-manager as
+  # The check that was missing. The git config has named git-credential-manager as
   # the helper for dev.azure.com since long before anything installed it, so on
   # every machine this repo has ever set up, that line pointed at a command
   # that was not there -- and git says nothing about it until the first push to
@@ -291,7 +291,7 @@ export def "every credential helper the gitconfig names is a tool this repo inst
   # Helpers beginning with "!" are shell commands rather than executables to be
   # found on PATH -- `!gh auth git-credential` is gh, already on the list -- so
   # they are not name-checked here.
-  let helpers = (open --raw ($REPO | path join "home" ".gitconfig")
+  let helpers = (open --raw ($REPO | path join "home" ".config" "git" "shared.conf")
     | lines
     | each {|l| $l | str trim }
     | where {|l| $l =~ '^helper\s*=' }
@@ -306,7 +306,7 @@ export def "every credential helper the gitconfig names is a tool this repo inst
     # An absolute path is its own failure, and a likely one: `git-credential-
     # manager configure`, which GCM's macOS installer runs for you, appends
     # `helper = /usr/local/share/gcm-core/git-credential-manager` to the global
-    # config -- which here is this very file, by symlink. That path does not
+    # config -- which was once this very file, by symlink. That path does not
     # exist on Linux, so committing it breaks every other machine quietly.
     assert not ($helper | str starts-with "/") $"($helper) is an absolute path, which only exists on the machine it was written on -- name the command and let PATH find it"
 
@@ -332,7 +332,7 @@ export def "every credential store is one GCM knows" [] {
   # Windows one is the easy mistake: `wincred` is git's old built-in helper,
   # GCM's name for the same Credential Manager is `wincredman`.
   let known = ["wincredman" "dpapi" "keychain" "secretservice" "gpg" "cache" "plaintext" "none"]
-  let files = ([($REPO | path join "home" ".gitconfig")]
+  let files = ([($REPO | path join "home" ".config" "git" "shared.conf")]
     ++ (glob ($REPO | path join "platform" "*" ".config" "git" "platform.conf" | paths for-glob)))
   for file in $files {
     let stores = (open --raw $file
@@ -346,18 +346,13 @@ export def "every credential store is one GCM knows" [] {
 }
 
 @test
-export def "the gitconfig includes the platform file" [] {
-  # git has no condition for "which system is this", but it does ignore an
-  # include whose file is absent -- so the file's existence is the condition,
-  # and the links step decides it. Losing this line silently drops every
-  # per-system git setting.
-  let rc = (open --raw ($REPO | path join "home" ".gitconfig"))
-  assert str contains $rc "~/.config/git/platform.conf" "nothing includes the platform file"
-
-  # Last, so it overrides what came before. Anything after it would win over
-  # the per-system settings, which is the opposite of the point.
-  let lines = ($rc | lines | where {|l| ($l | str trim | is-not-empty) and (not ($l | str trim | str starts-with "#")) })
-  assert str contains ($lines | last) "platform.conf" $"the include is not the last thing in .gitconfig; found: ($lines | last)"
+export def "the shared git config includes nothing itself" [] {
+  # ~/.gitconfig includes shared.conf and then platform.conf, in that order,
+  # so the per-system settings win. An include inside shared.conf would be
+  # applied in shared.conf's place instead, and whatever it named would lose to
+  # platform.conf -- or, naming platform.conf, apply it twice.
+  let rc = (open --raw ($REPO | path join "home" ".config" "git" "shared.conf"))
+  assert not ($rc | str contains "[include") "shared.conf has an include; ~/.gitconfig is where they go"
 }
 
 @test

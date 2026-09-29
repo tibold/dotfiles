@@ -13,17 +13,16 @@
 #             %APPDATA% on Windows, not %LOCALAPPDATA%
 #   rio       ~/.config even on macOS, ignoring the convention above, and
 #             %LOCALAPPDATA% on Windows
-#   git       ~/.gitconfig everywhere, Windows included -- an entry that
-#             names a file rather than a directory
 #
 # There is no deriving that. Each project decided separately, and the only
 # honest way to hold it is to write down the ones that deviate.
 #
-# Two more entries exist for a different reason: Windows does not mirror
+# Three more entries exist for a different reason: Windows does not mirror
 # home/ at all (see NOT_ON_WINDOWS below), so tmux-themes links the tmux
 # theme files -- which psmux, tmux's Windows replacement, reads as they are
-# -- into their ordinary location purely to get them there, and claude does
-# the same for the Claude Code status line script.
+# -- into their ordinary location purely to get them there, and git and
+# claude do the same for the shared git config and the Claude Code status
+# line script. Those two name a file rather than a directory.
 #
 # Left as a link rather than moving the file: the copy under ~/.config stays,
 # so a config is always findable where the rest of them are, and the second
@@ -77,12 +76,13 @@ export const PLACES = [
     source: ".config/tmux/themes"
     dirs: { windows: ".config/tmux/themes" }
   }
-  # A file rather than a directory: git reads ~/.gitconfig on every platform,
-  # and on Windows nothing else would put it there.
+  # The shared git settings, which ~/.gitconfig includes (see
+  # steps/gitconfig.nu). The file rather than ~/.config/git: git keeps this
+  # machine's ignore and attributes files in there too.
   {
     app: "git"
-    source: ".gitconfig"
-    dirs: { windows: ".gitconfig" }
+    source: ".config/git/shared.conf"
+    dirs: { windows: ".config/git/shared.conf" }
   }
   # The script settings.json's statusLine runs; steps/claude.nu writes that
   # key. The file alone, never ~/.claude itself: Claude Code keeps its

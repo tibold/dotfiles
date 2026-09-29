@@ -6,9 +6,10 @@
 # databases and k8s-tools right after them, being more of the same (and krew,
 # which k8s-tools also installs, needs git); claude before neovim so the
 # plugin in the neovim config can be registered in the same run; the language
-# SDKs before neovim too, so its language servers find them; macos last. Every name is here on every platform so `--only X` answers "that step
+# SDKs before neovim too, so its language servers find them; gitconfig after
+# links and appdirs, which put the files it includes in place; macos last. Every name is here on every platform so `--only X` answers "that step
 # does not apply here" rather than "unknown step".
-export const ORDER = ["packages" "databases" "k8s-tools" "plugins" "cleanup" "links" "appdirs" "zsh" "powershell" "claude" "dotnet" "rust" "neovim" "hooks" "macos"]
+export const ORDER = ["packages" "databases" "k8s-tools" "plugins" "cleanup" "links" "appdirs" "gitconfig" "zsh" "powershell" "claude" "dotnet" "rust" "neovim" "hooks" "macos"]
 
 # Run only when named, with --with or --only. Claude Code is a personal tool
 # that authenticates interactively, and not every machine this repo lands on

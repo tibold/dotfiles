@@ -61,10 +61,10 @@ lib/              system detection, package resolution, linking, the
                   handed to nushell's glob (paths.nu). No side effects except
                   in apply.
 steps/            The parts of an install: packages, nushell plugins,
-                  cleanup, links, app config dirs, zsh, the pwsh profile
-                  (Windows), Claude Code, the Kubernetes tools, the .NET SDK
-                  and Rust (all four opt-in), neovim, git hooks, macOS
-                  defaults.
+                  cleanup, links, app config dirs, the git config, zsh, the
+                  pwsh profile (Windows), Claude Code, the Kubernetes tools,
+                  the .NET SDK and Rust (all four opt-in), neovim, git hooks,
+                  macOS defaults.
 tools/            Standalone utilities, not run by the installer. These are
                   Linux-only; they configure GDM, KVM, WireGuard and RKE2.
 githooks/         Enabled via core.hooksPath; currently a gitleaks scan.
@@ -352,19 +352,18 @@ nushell   the same split on macOS, for the same reason: both follow the
           platform's own convention; %APPDATA% on Windows, not %LOCALAPPDATA%
 rio       ~/.config even on macOS, ignoring the convention above, and
           %LOCALAPPDATA% on Windows
-git       ~/.gitconfig everywhere, Windows included -- an entry that
-          names a file rather than a directory
 ```
 
 `steps/appdirs.nu` lists the ones that deviate and links the config a second
 time, into the directory that application actually opens. The copy under
 `~/.config` stays, so configs remain findable in one place.
 
-Two more entries exist for a different reason: Windows does not mirror `home/`
-at all (see [Windows](#windows)), so a `tmux-themes` entry links
+Three more entries exist for a different reason: Windows does not mirror
+`home/` at all (see [Windows](#windows)), so a `tmux-themes` entry links
 `~/.config/tmux/themes` back to the same place it already sits, purely to get
 the files onto a Windows machine at all -- `psmux`, tmux's Windows stand-in,
-reads them from there unchanged -- and a `claude` entry does the same for
+reads them from there unchanged -- and `git` and `claude` entries do the same
+for `~/.config/git/shared.conf` (see [Git config](#git-config)) and
 `~/.claude/statusline-command.sh` (see [Claude Code](#claude-code)).
 
 Files, never the whole directory: applications keep state next to their config
@@ -401,15 +400,17 @@ This exists for the file formats that have no condition of their own. git is
 the case in hand: `includeIf` can ask about a directory, a branch or a remote,
 but not about which machine it is running on. What it does have is that an
 `[include]` naming a file that does not exist is silently ignored -- so the
-file's existence becomes the condition, and this step is what decides it:
+file's existence becomes the condition, and this step is what decides it.
+`~/.gitconfig` includes it after the shared file, so it overrides that (see
+[Git config](#git-config)):
 
 ```gitconfig
-# home/.gitconfig, last so it overrides what is above
 [include]
+	path = ~/.config/git/shared.conf
 	path = ~/.config/git/platform.conf
 ```
 
-The first use is the credential store. `home/.gitconfig` asks for `plaintext`,
+The first use is the credential store. `shared.conf` asks for `plaintext`,
 which is the honest answer on a headless Linux box -- there is no secret
 service to talk to, and the credentials go to `~/.gcm/store` unencrypted.
 macOS has the Keychain, so `platform/macos/` puts it back:
@@ -420,16 +421,45 @@ macOS has the Keychain, so `platform/macos/` puts it back:
 ```
 
 Windows has the Credential Manager, so `platform/windows/` does the same with
-`wincred`:
+`wincredman`:
 
 ```gitconfig
 [credential "https://dev.azure.com"]
-	credentialStore = wincred
+	credentialStore = wincredman
 ```
 
 A misspelled directory -- `platform/darwin/`, say -- would link nothing and
 say nothing, so `tests/unit/configs.nu` fails on any name that cannot match a
 system this repo supports.
+
+## Git config
+
+`~/.gitconfig` belongs to the machine, not to this repo. Tools write to it --
+`git config --global`, Git Credential Manager adding a host -- and when it was
+a link into this checkout, every such write landed in the repo, to be either
+committed to every machine or left as a local change for good. So the shared
+settings live in `home/.config/git/shared.conf`, linked like any other config,
+and the `gitconfig` step puts two includes at the top of `~/.gitconfig`:
+
+```gitconfig
+# Added by dotfiles (nu install.nu --only gitconfig): ...
+[include]
+	path = ~/.config/git/shared.conf
+	path = ~/.config/git/platform.conf
+```
+
+git applies an include where it appears, so the order is shared, then
+per-system, then whatever this machine has below them -- each overriding the
+last. The step creates the file if it is missing, adds the includes above an
+existing file's contents, and does nothing once they are there. A
+`~/.gitconfig` that is still the old link into this repo is replaced by a real
+file with just the includes; the links step may already have pruned it as a
+dead link, which comes to the same thing. A link pointing anywhere else is left
+alone, with a warning saying what to add by hand.
+
+`shared.conf` itself must not include anything: an include there would be
+applied in its place, before `platform.conf`, and `tests/unit/configs.nu`
+fails on one.
 
 ## macOS
 
@@ -624,8 +654,9 @@ through [`steps/appdirs.nu`](#applications-that-keep-their-config-elsewhere),
 one named application at a time: lazygit and rio into `%LOCALAPPDATA%`,
 nushell into `%APPDATA%`, the tmux theme files into their ordinary
 `~/.config/tmux/themes` (psmux reads them from there directly), and
-`~/.gitconfig` and `~/.claude/statusline-command.sh` as the entries that link
-a single file rather than a directory. `tests/unit/appdirs.nu` fails for any `home/.config/<app>/` that is
+`~/.config/git/shared.conf` and `~/.claude/statusline-command.sh` as the
+entries that link a single file rather than a directory.
+`tests/unit/appdirs.nu` fails for any `home/.config/<app>/` that is
 not in `PLACES` for Windows and not named, with a reason, in `NOT_ON_WINDOWS`
 -- currently just `tmux`, whose own config directory has no Windows reader at
 all, only its themes -- so a new config added under `home/.config/` cannot
@@ -654,10 +685,8 @@ dot-sources `~/.config/powershell/local.ps1` last, if it exists --
 machine-specific PowerShell (an MSVC `PATH`, a Chocolatey profile, whatever
 this machine needs) that, like the git file below, never enters the repo.
 
-git also reads `~/.config/git/config`, alongside `~/.gitconfig`, and the repo
-does not manage it -- the same trick [Per-system settings](#per-system-settings)
-uses for `platform/windows/.config/git/platform.conf`, but for settings that
-belong to one machine rather than to every Windows machine.
+Settings for one machine rather than every Windows machine go in
+`~/.gitconfig` itself, below the includes -- see [Git config](#git-config).
 
 ### Shell: pwsh, oh-my-posh, psmux
 

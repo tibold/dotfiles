@@ -24,6 +24,7 @@ use steps/cleanup.nu
 use steps/zsh.nu
 use steps/neovim.nu
 use steps/githooks.nu
+use steps/gitconfig.nu
 use steps/macos.nu
 use steps/appdirs.nu
 use steps/powershell.nu
@@ -133,6 +134,8 @@ def --env main [
       # first place; this adds the second link for the applications that read
       # it from somewhere else.
       "appdirs" => (appdirs install $system --root $root --home $target --copy=$copy --dry-run=$dry_run)
+      # After links and appdirs, which put the files it includes in place.
+      "gitconfig" => (gitconfig install --root $root --home $target --dry-run=$dry_run)
       "zsh" => (zsh install --home $target --dry-run=$dry_run)
       "neovim" => {
         if ($nvim_repo | is-empty) {
