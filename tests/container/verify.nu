@@ -11,6 +11,7 @@ const REPO = (path self | path dirname | path dirname | path dirname)
 use ../../lib/links.nu
 use ../../lib/distro.nu
 use ../../lib/packages.nu
+use ../../lib/fallback.nu
 use ../../packages/common.nu
 
 # Binaries that must be on PATH afterwards, whatever route they arrived by --
@@ -64,6 +65,14 @@ def main [] {
   $results = ($results | append (check "every expected tool is on PATH"
     ($missing | is-empty)
     $"missing: ($missing | str join ', ')"))
+
+  # Whichever route it took, the nvim that a shell finds first must be new
+  # enough for the neovim config's plugins -- a distro build left ahead of it
+  # on PATH would pass the check above and still be the wrong editor.
+  let nvim = (do { ^zsh -i -c "nvim --version" } | complete | get stdout | fallback reported-version $in)
+  $results = ($results | append (check "nvim is 0.12 or newer"
+    (($nvim != null) and (fallback at-least $nvim "0.12.0"))
+    $"nvim reports ($nvim)"))
 
   # --- the shells --------------------------------------------------------------
   #

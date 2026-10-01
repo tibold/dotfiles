@@ -118,6 +118,26 @@ export const SOURCES = {
     layout: "directory"
   }
 
+  # Debian's and Leap's neovim are too old for the plugins the neovim config
+  # uses, which want 0.12. The archive is the editor plus its runtime files
+  # (bin/, lib/, share/), and nvim finds those relative to its own resolved
+  # path, so it is kept whole and linked to.
+  #
+  # `minimum` because a neovim is nearly always on PATH already -- the distro's,
+  # from before this entry existed -- and "on PATH" alone would keep it
+  # forever. Anything older is replaced; ~/.local/bin comes first on PATH, so
+  # the distro package can stay installed without shadowing this one.
+  neovim: {
+    repo: "neovim/neovim"
+    assets: {
+      x86_64: "nvim-linux-x86_64.tar.gz"
+      aarch64: "nvim-linux-arm64.tar.gz"
+    }
+    binaries: ["bin/nvim"]
+    layout: "directory"
+    minimum: "0.12.0"
+  }
+
   # -- Kubernetes tools (packages/common.nu K8S_TOOLS), opt-in --
   #
   # The version is still read from the GitHub repository's latest release, but
@@ -222,6 +242,47 @@ export def resolve-asset [tool: string, --arch: string]: nothing -> record {
   }
 }
 
+# The first x.y.z in what a command says about itself, or null.
+export def reported-version [text: string]: nothing -> any {
+  let found = ($text | parse --regex '(?<v>\d+\.\d+\.\d+)')
+  if ($found | is-empty) { null } else { $found | first | get v }
+}
+
+# Whether version is minimum or newer, compared part by part as numbers.
+export def at-least [version: string, minimum: string]: nothing -> bool {
+  let have = ($version | split row "." | each { into int })
+  let want = ($minimum | split row "." | each { into int })
+  for i in 0..<($want | length) {
+    let h = ($have | get --optional $i | default 0)
+    let w = ($want | get $i)
+    if $h != $w { return ($h > $w) }
+  }
+  true
+}
+
+# Where a command would run from: bin-dir first, since that is where this puts
+# things and the session running the install often does not have it on PATH
+# yet; otherwise PATH. Null when it is in neither.
+def locate [command: string, bin_dir: path]: nothing -> any {
+  let local = ($bin_dir | path join $command)
+  if ($local | path exists) { return $local }
+  which $command | get --optional 0.path
+}
+
+# Whether a tool is already installed well enough to leave alone. A source
+# with a `minimum` must also report at least that version, so a stale distro
+# build does not count.
+export def satisfied [source: record, bin_dir: path]: nothing -> bool {
+  # Counted rather than checked for nulls: `each` drops a null result, so a
+  # missing binary shortens the list instead of appearing in it.
+  let found = ($source.binaries | each {|b| locate ($b | path basename) $bin_dir })
+  if ($found | length) != ($source.binaries | length) { return false }
+  let minimum = ($source.minimum? | default null)
+  if $minimum == null { return true }
+  let reported = (do { ^($found | first) --version } | complete | get stdout | reported-version $in)
+  ($reported != null) and (at-least $reported $minimum)
+}
+
 # How a tool's archive turns into an installed tool.
 #
 #   binaries   the named executables are lifted out and the rest discarded.
@@ -229,6 +290,8 @@ export def resolve-asset [tool: string, --arch: string]: nothing -> record {
 #              a licence and a README.
 #   directory  the whole archive is kept together and the binaries are linked
 #              to from bin-dir, because the executable does not work alone.
+#              A binary may be a path inside the archive (neovim's bin/nvim);
+#              the link takes its last segment.
 #   executable there is no archive: the download is the one binary, and goes
 #              into bin-dir as it is. kubectl is published that way.
 #
@@ -288,11 +351,11 @@ export def install-directory [
       error make { msg: $"($asset.name) does not contain a '($binary)' binary" }
     }
     ^chmod +x $target
-    let link = ($bin_dir | path join $binary)
+    let link = ($bin_dir | path join ($binary | path basename))
     # -n so an existing link to a directory is replaced rather than followed
     # into, the same flags the dotfile links use.
     ^ln -sfn $target $link
-    log ok $"($binary) -> ($link)"
+    log ok $"($binary | path basename) -> ($link)"
   }
 }
 
@@ -310,12 +373,7 @@ export def install [
     return
   }
 
-  # On PATH, or already in bin-dir: bin-dir is where this puts things, and the
-  # session running the install often does not have it on PATH yet.
-  let present = ($source.binaries | all {|b|
-    (which $b | is-not-empty) or ($bin_dir | path join $b | path exists)
-  })
-  if $present and (not $force) {
+  if (satisfied $source $bin_dir) and (not $force) {
     log skipped $"($tool) already on PATH"
     return
   }

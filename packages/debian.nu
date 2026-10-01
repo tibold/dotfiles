@@ -30,6 +30,10 @@ export const OVERRIDES = {
 
   nerd-fonts: null
 
+  # 0.10 on Debian stable and 0.9 on Ubuntu 24.04; the neovim config's plugins
+  # want 0.12. From the upstream release instead.
+  neovim: null
+
   # The archive has it as fd-find, but installs the binary as `fdfind`, since
   # Debian already had an unrelated `fd`. The upstream release is just `fd`.
   fd: null

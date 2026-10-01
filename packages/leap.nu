@@ -10,6 +10,8 @@ export const OVERRIDES = {
   kubectl: null
   k9s: null
 
+  # 0.11 on Leap 16; the neovim config's plugins want 0.12.
+  neovim: null
   lazygit: null
   git-delta: null
   gitleaks: null

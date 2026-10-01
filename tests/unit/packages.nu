@@ -550,3 +550,71 @@ export def "gcc on Debian can link, not just compile" [] {
   assert ("gcc" in $resolved.install)
   assert ("libc6-dev" in $resolved.install)
 }
+
+@test
+export def "neovim comes from upstream where the distro packages one older than 0.12" [] {
+  # Debian stable carries 0.10, Ubuntu 24.04 0.9 and Leap 16 0.11; the neovim
+  # config's plugins want 0.12.
+  for distro in [$UBUNTU $LEAP] {
+    let resolved = (packages resolve $distro)
+    assert ("neovim" in $resolved.fallback) $"($distro.id) installs the distro's neovim"
+  }
+  for distro in [$TUMBLEWEED $FEDORA] {
+    assert ("neovim" in (packages resolve $distro).install) $"($distro.id) should take neovim from its own repos"
+  }
+}
+
+@test
+export def "a version is read out of what a command prints" [] {
+  assert equal (fallback reported-version "NVIM v0.12.5\nBuild type: Release") "0.12.5"
+  assert equal (fallback reported-version "no version here") null
+}
+
+@test
+export def "versions compare as numbers, part by part" [] {
+  assert (fallback at-least "0.12.0" "0.12.0")
+  assert (fallback at-least "0.12.5" "0.12.0")
+  assert (fallback at-least "1.0.0" "0.12.0")
+  # As strings "0.9.5" would sort after "0.12.0".
+  assert not (fallback at-least "0.9.5" "0.12.0")
+  assert not (fallback at-least "0.11.6" "0.12.0")
+}
+
+@test
+export def "a binary inside the archive is linked under its own name" [] {
+  # Skipped on Windows for the reason in the tests above: install-directory
+  # needs the Unix `cp`, `chmod` and `ln`.
+  if $nu.os-info.name == "windows" { return }
+
+  # neovim's shape: the executable is bin/nvim, beside the lib/ and share/ it
+  # loads its runtime from.
+  let base = (mktemp --directory --tmpdir "dotfiles-fallback-XXXXXX")
+  let payload = ($base | path join "payload")
+  let bin = ($base | path join ".local" "bin")
+  mkdir ($payload | path join "nvim-linux-x86_64" "bin")
+  mkdir ($payload | path join "nvim-linux-x86_64" "share" "nvim")
+  "binary" | save ($payload | path join "nvim-linux-x86_64" "bin" "nvim")
+
+  fallback install-directory "neovim" {
+    name: "nvim-linux-x86_64.tar.gz"
+    binaries: ["bin/nvim"]
+  } --payload $payload --bin-dir $bin
+
+  let share = (fallback share-dir "neovim" --bin-dir $bin)
+  assert ($share | path join "share" "nvim" | path exists) "the runtime files were left behind"
+  assert not ($bin | path join "bin" | path exists) "the link kept the archive's directory"
+  assert equal ($bin | path join "nvim" | path expand) ($share | path join "bin" "nvim" | path expand)
+
+  rm --recursive --force $base
+}
+
+@test
+export def "a tool that is nowhere is not mistaken for installed" [] {
+  # The check every fallback download goes through. When it got this wrong, no
+  # upstream release was ever fetched and every one of them read as present.
+  let bin = (mktemp --directory --tmpdir "dotfiles-fallback-XXXXXX")
+  let missing = { binaries: ["dotfiles-no-such-tool"] }
+  assert not (fallback satisfied $missing $bin)
+  assert not (fallback satisfied ($missing | insert minimum "0.12.0") $bin)
+  rm --recursive --force $bin
+}

@@ -145,6 +145,12 @@ accounted for one of these ways:
 `tests/unit/packages.nu` fails if a tool is nulled and none of those applies, so
 a tool cannot quietly disappear from one system's environment.
 
+Nulling also covers a package that exists but is too old: neovim is nulled on
+Debian and Leap, whose 0.9 to 0.11 builds the neovim config's plugins no longer
+accept. A fallback entry normally skips a tool already on PATH; one with a
+`minimum` version replaces anything older, so a distro build installed before
+the entry existed does not stay forever.
+
 `PROVIDED` and `OMITTED` are not the same claim and the tests hold them apart.
 "Homebrew does not package zsh for you because macOS already did" and "there is
 no Nerd Font in Debian's archive and we have decided to live without one" would
