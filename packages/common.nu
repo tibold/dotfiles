@@ -41,6 +41,9 @@ export const PACKAGES = [
 
   # -- Search and navigation --
   ripgrep
+  # neovim's file pickers list files through fd when it is there, and fall
+  # back to slower ways when it is not.
+  fd
   fzf
   jq
   # `z <part of a name>` jumps to the directory you use most that matches,

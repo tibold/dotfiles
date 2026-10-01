@@ -19,7 +19,7 @@ use ../../packages/common.nu
 # implementation detail, having the command is the requirement.
 const REQUIRED = [
   "nu" "git" "zsh" "tmux" "nvim"
-  "rg" "fzf" "jq" "htop" "make" "gcc"
+  "rg" "fd" "fzf" "jq" "htop" "make" "gcc"
   "lazygit" "delta" "gitleaks" "gh"
   # No distribution packages this, so on every Linux target it arrives from the
   # upstream release -- and by a different route to the others, because its

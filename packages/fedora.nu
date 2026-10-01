@@ -19,6 +19,7 @@ export const OVERRIDES = {
   mkisofs: "xorriso"
 
   pipx: "pipx"
+  fd: "fd-find"
   neovim-python: "python3-neovim"
 
   # Not in Fedora's repos under any name the container test could find.

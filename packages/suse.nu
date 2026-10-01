@@ -38,6 +38,7 @@ export const OVERRIDES = {
 
   fzf: ["fzf" "fzf-tmux" "fzf-zsh-integration" "vim-fzf"]
   ripgrep: ["ripgrep" "ripgrep-bash-completion" "ripgrep-zsh-completion"]
+  fd: ["fd" "fd-bash-completion" "fd-zsh-completion"]
 
   # One package per plugin, built from the same source as the nushell package
   # so the versions always agree. Kept in step with NUSHELL_PLUGINS in

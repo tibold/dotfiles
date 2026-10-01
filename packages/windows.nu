@@ -38,6 +38,7 @@ export const OVERRIDES = {
   git-delta: "dandavison.delta"
   gitleaks: "Gitleaks.Gitleaks"
   ripgrep: "BurntSushi.ripgrep.MSVC"
+  fd: "sharkdp.fd"
   fzf: "junegunn.fzf"
   zoxide: "ajeetdsouza.zoxide"
   jq: "jqlang.jq"

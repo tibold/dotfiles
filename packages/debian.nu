@@ -30,6 +30,10 @@ export const OVERRIDES = {
 
   nerd-fonts: null
 
+  # The archive has it as fd-find, but installs the binary as `fdfind`, since
+  # Debian already had an unrelated `fd`. The upstream release is just `fd`.
+  fd: null
+
   # gh needs GitHub's own apt repo; the rest are not packaged at all. They all
   # come from upstream releases instead.
   gh: null

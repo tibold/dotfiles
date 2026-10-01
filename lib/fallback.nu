@@ -87,6 +87,15 @@ export const SOURCES = {
     }
     binaries: ["gh"]
   }
+  # The archive names keep the tag's "v".
+  fd: {
+    repo: "sharkdp/fd"
+    assets: {
+      x86_64: "fd-{tag}-x86_64-unknown-linux-gnu.tar.gz"
+      aarch64: "fd-{tag}-aarch64-unknown-linux-gnu.tar.gz"
+    }
+    binaries: ["fd"]
+  }
   # No distribution packages this, so every Linux machine takes it from here.
   #
   # The usual instruction is `dotnet tool install -g git-credential-manager`,
