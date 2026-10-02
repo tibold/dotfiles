@@ -189,7 +189,9 @@ if [[ ${LANG:-} != *[Uu][Tt][Ff]* ]]; then
   fi
 fi
 
-source $ZSH/oh-my-zsh.sh
+# Pylon and VS Code start a hidden login shell only to read the environment;
+# oh-my-zsh adds nothing to PATH, so skip it there.
+[[ -n $PYLON_RESOLVING_ENVIRONMENT$VSCODE_RESOLVING_ENVIRONMENT ]] || source $ZSH/oh-my-zsh.sh
 
 # User configuration
 
@@ -273,8 +275,8 @@ zstyle ':completion:*' original true
 zstyle ':completion:*' select-prompt %SScrolling active: current selection at %p%s
 zstyle :compinstall filename "$HOME/.zshrc"
 
-autoload -Uz compinit
-compinit
+# No compinit here: oh-my-zsh has run it (with its own cached dump); a second
+# one rebuilt ~/.zcompdump on every start (~0.5 s).
 # End of lines added by compinstall
 # Lines configured by zsh-newuser-install
 HISTFILE=~/.zsh.history
